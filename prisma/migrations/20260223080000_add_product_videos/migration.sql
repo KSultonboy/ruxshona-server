@@ -1,0 +1,9 @@
+ALTER TABLE "Product"
+ADD COLUMN IF NOT EXISTS "videos" TEXT[] DEFAULT ARRAY[]::TEXT[];
+
+UPDATE "Product"
+SET "videos" = ARRAY[]::TEXT[]
+WHERE "videos" IS NULL;
+
+ALTER TABLE "Product"
+ALTER COLUMN "videos" SET NOT NULL;

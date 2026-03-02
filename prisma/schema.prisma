@@ -1,0 +1,809 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProductType {
+  PRODUCT
+  INGREDIENT
+  DECOR
+  UTILITY
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+}
+
+enum ExpenseCategoryType {
+  NORMAL
+  SELLABLE
+}
+
+enum PaymentSourceType {
+  BRANCH
+  SHOP
+}
+
+enum StockMovementType {
+  IN
+  OUT
+}
+
+enum TransferStatus {
+  PENDING
+  RECEIVED
+  CANCELED
+}
+
+enum ReturnStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TransferTargetType {
+  BRANCH
+  SHOP
+}
+
+enum ReturnSourceType {
+  BRANCH
+  SHOP
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum BranchWarehouseMode {
+  CENTRAL
+  SEPARATE
+}
+
+enum OrderStatus {
+  NEW
+  IN_DELIVERY
+  DELIVERED
+  CANCELED
+}
+
+enum OrderChannel {
+  WEBSITE
+  TELEGRAM
+  PHONE
+  OTHER
+}
+
+enum InventoryCheckStatus {
+  PENDING
+  COMPLETED
+  CANCELED
+}
+
+enum UserRole {
+  ADMIN
+  SALES
+  PRODUCTION
+}
+
+enum AlertRuleType {
+  BRANCH_DEBT_LIMIT
+  BRANCH_STOCK_MIN
+  PAYMENT_OVERDUE_DAYS
+}
+
+enum Permission {
+  USERS_READ
+  USERS_WRITE
+  BRANCHES_READ
+  BRANCHES_WRITE
+  SHOPS_READ
+  SHOPS_WRITE
+  PRODUCTS_READ
+  PRODUCTS_WRITE
+  EXPENSES_READ
+  EXPENSES_WRITE
+  WAREHOUSE_READ
+  WAREHOUSE_WRITE
+  TRANSFERS_READ
+  TRANSFERS_WRITE
+  TRANSFERS_RECEIVE
+  RETURNS_READ
+  RETURNS_WRITE
+  RETURNS_APPROVE
+  SALES_READ
+  SALES_WRITE
+  PAYMENTS_READ
+  PAYMENTS_WRITE
+  REPORTS_READ
+  ALERTS_READ
+  ALERTS_WRITE
+  AUDIT_READ
+}
+
+model Branch {
+  id            String              @id @default(cuid())
+  name          String
+  address       String?
+  phone         String?
+  warehouseMode BranchWarehouseMode @default(SEPARATE)
+
+  users        User[]
+  branchStocks BranchStock[]
+  transfers    Transfer[]
+  returns      Return[]
+  sales        Sale[]
+  shifts       Shift[]
+  payments     Payment[]
+  alertRules   AlertRule[]
+  permissions  UserPermission[]
+  inventoryChecks InventoryCheck[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name])
+}
+
+model Shop {
+  id      String  @id @default(cuid())
+  name    String
+  address String?
+  phone   String?
+
+  transfers Transfer[]
+  returns   Return[]
+  payments  Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name])
+}
+
+model Unit {
+  id    String @id @default(cuid())
+  name  String
+  short String
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, short])
+}
+
+model ProductCategory {
+  id   String @id @default(cuid())
+  name String @unique
+
+  products Product[]
+  expenseCategories ExpenseCategory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ExpenseCategory {
+  id   String @id @default(cuid())
+  name String @unique
+  type ExpenseCategoryType @default(NORMAL)
+  productCategoryId String?
+
+  expenses Expense[]
+  expenseItems ExpenseItem[]
+  productCategory ProductCategory? @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id       String      @id @default(cuid())
+  name     String
+  barcode  String?     @unique
+  type     ProductType
+  price    Int?
+  salePrice Int?
+  shopPrice Int?
+  active   Boolean     @default(true)
+  images   String[]
+  videos   String[]     @default([])
+  stock    Float       @default(0)
+  minStock Int         @default(0)
+  labourPrice Int      @default(0)
+
+  categoryId String
+  unitId     String
+
+  category       ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  unit           Unit            @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  stockMovements StockMovement[]
+  branchStocks   BranchStock[]
+  transferItems  TransferItem[]
+  returnItems    ReturnItem[]
+  sales          Sale[]
+  alertRules     AlertRule[]
+  inventoryCheckItems InventoryCheckItem[]
+  expenses       Expense[]
+  expenseItems   ExpenseItem[]
+  orderItems     OrderItem[]
+  reviews        Review[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([active])
+  @@index([categoryId])
+  @@index([unitId])
+}
+
+model BranchStock {
+  id        String @id @default(cuid())
+  branchId  String
+  productId String
+  quantity  Float  @default(0)
+
+  branch  Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, productId])
+  @@index([branchId])
+  @@index([productId])
+}
+
+model Expense {
+  id String @id @default(cuid())
+
+  // Frontend YYYY-MM-DD yuboradi => timezone muammosi bo‘lmasin deb String saqlaymiz
+  date String @db.VarChar(10)
+
+  amount        Int
+  paymentMethod PaymentMethod
+  note          String?
+  quantity      Int?
+
+  categoryId String
+  category   ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  productId  String?
+  product    Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
+  expenseItemId String?
+  expenseItem ExpenseItem? @relation(fields: [expenseItemId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([categoryId])
+  @@index([productId])
+  @@index([expenseItemId])
+  @@index([paymentMethod])
+}
+
+model ExpenseItem {
+  id String @id @default(cuid())
+  name String
+
+  categoryId String
+  category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  expenses Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([productId])
+  @@unique([categoryId, name])
+}
+
+model StockMovement {
+  id       String            @id @default(cuid())
+  date     String            @db.VarChar(10)
+  type     StockMovementType
+  quantity Float
+  note     String?
+
+  productId String
+  createdById String?
+  
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([productId])
+  @@index([createdById])
+  @@index([type])
+}
+
+model Transfer {
+  id         String             @id @default(cuid())
+  date       String             @db.VarChar(10)
+  status     TransferStatus     @default(PENDING)
+  targetType TransferTargetType
+  note       String?
+
+  branchId String?
+  shopId   String?
+
+  createdById  String
+  receivedById String?
+
+  branch     Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shop       Shop?   @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  createdBy  User    @relation("TransferCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  receivedBy User?   @relation("TransferReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+
+  items     TransferItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([targetType])
+  @@index([branchId])
+  @@index([shopId])
+  @@index([createdById])
+}
+
+model TransferItem {
+  id         String @id @default(cuid())
+  transferId String
+  productId  String
+  quantity   Int
+
+  transfer Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([transferId])
+  @@index([productId])
+}
+
+model Return {
+  id         String           @id @default(cuid())
+  date       String           @db.VarChar(10)
+  status     ReturnStatus     @default(PENDING)
+  sourceType ReturnSourceType
+  note       String?
+
+  branchId String?
+  shopId   String?
+
+  createdById  String
+  approvedById String?
+
+  branch     Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shop       Shop?   @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  createdBy  User    @relation("ReturnCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy User?   @relation("ReturnApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  items ReturnItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([sourceType])
+  @@index([branchId])
+  @@index([shopId])
+  @@index([createdById])
+}
+
+model ReturnItem {
+  id       String @id @default(cuid())
+  returnId String
+  productId String
+  quantity Int
+
+  ret     Return  @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([returnId])
+  @@index([productId])
+}
+
+model Shift {
+  id     String      @id @default(cuid())
+  date   String      @db.VarChar(10)
+  status ShiftStatus @default(OPEN)
+  photos String[]
+
+  branchId   String
+  openedById String
+  closedAt   DateTime?
+
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  openedBy User   @relation("ShiftOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([openedById])
+  @@index([status])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String   @default("")
+  username     String   @unique
+  passwordHash String
+  role         UserRole @default(ADMIN)
+  roleLabel    String?
+  active       Boolean  @default(true)
+  protected    Boolean  @default(false)
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  refreshTokens RefreshToken[]
+  pushTokens   PushToken[]
+  transfersCreated Transfer[] @relation("TransferCreatedBy")
+  transfersReceived Transfer[] @relation("TransferReceivedBy")
+  returnsCreated Return[] @relation("ReturnCreatedBy")
+  returnsApproved Return[] @relation("ReturnApprovedBy")
+  sales Sale[]
+  shifts Shift[] @relation("ShiftOpenedBy")
+  permissions UserPermission[]
+  payments Payment[] @relation("PaymentCreatedBy")
+  auditLogs AuditLog[]
+  inventoryChecks InventoryCheck[]
+  stockMovements StockMovement[]
+  wagePayments WagePayment[]
+  wagePaymentsCreated WagePayment[] @relation("WagePaymentCreatedBy")
+  ordersCreated Order[] @relation("OrderCreatedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String   @unique
+  passwordHash String
+  address      String?
+  active       Boolean  @default(true)
+
+  orders Order[]
+  reviews Review[]
+  customRequests CustomRequest[]
+  points         Int             @default(0)
+  birthday       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserPermission {
+  id         String      @id @default(cuid())
+  userId     String
+  permission Permission
+  branchId   String?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, permission, branchId])
+  @@index([userId])
+  @@index([branchId])
+}
+
+model AuditLog {
+  id       String   @id @default(cuid())
+  action   String
+  entity   String
+  entityId String?
+  method   String
+  path     String
+  userId   String?
+  userRole UserRole?
+  meta     Json?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity])
+  @@index([createdAt])
+}
+
+model WagePayment {
+  id            String        @id @default(cuid())
+  amount        Int
+  date          String        @db.VarChar(10)
+  note          String?
+  paymentMethod PaymentMethod
+
+  userId      String
+  createdById String
+
+  user      User @relation(fields: [userId], references: [id])
+  createdBy User @relation("WagePaymentCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([date])
+}
+
+model Payment {
+  id            String            @id @default(cuid())
+  date          String            @db.VarChar(10)
+  sourceType    PaymentSourceType
+  amount        Int
+  paymentMethod PaymentMethod
+  note          String?
+
+  branchId String?
+  shopId   String?
+  createdById String
+
+  branch    Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shop      Shop?   @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  createdBy User    @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([sourceType])
+  @@index([branchId])
+  @@index([shopId])
+  @@index([createdById])
+}
+
+model AlertRule {
+  id        String        @id @default(cuid())
+  type      AlertRuleType
+  threshold Int
+  active    Boolean       @default(true)
+  note      String?
+
+  branchId String?
+  productId String?
+
+  branch  Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([branchId])
+  @@index([productId])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PushToken {
+  id       String @id @default(cuid())
+  token    String @unique
+  platform String?
+  device   String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Sale {
+  id          String         @id @default(cuid())
+  date        String         @db.VarChar(10)
+  quantity    Float
+  paymentMethod PaymentMethod
+  price       Int
+
+  branchId    String
+  productId   String
+  createdById String
+
+  branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdBy User    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([productId])
+  @@index([createdById])
+  @@index([date])
+}
+
+model Order {
+  id           String       @id @default(cuid())
+  trackCode    String?      @unique
+  date         String       @db.VarChar(10)
+  customerName String
+  phone        String?
+  address      String?
+  source       String       @default("ERP")
+  channel      OrderChannel @default(WEBSITE)
+  status       OrderStatus  @default(NEW)
+  total        Int
+  note         String?
+
+  createdById String?
+  createdBy   User? @relation("OrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  items OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([source])
+  @@index([channel])
+  @@index([status])
+  @@index([createdById])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  productId   String?
+  productName String
+  quantity    Float
+  unitPrice   Int
+  lineTotal   Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model InventoryCheck {
+  id     String               @id @default(cuid())
+  date   String               @db.VarChar(10)
+  status InventoryCheckStatus @default(PENDING)
+  note   String?
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  items InventoryCheckItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([status])
+}
+
+model InventoryCheckItem {
+  id               String @id @default(cuid())
+  inventoryCheckId String
+  productId        String
+  systemQuantity   Int
+  actualQuantity   Int
+
+  inventoryCheck InventoryCheck @relation(fields: [inventoryCheckId], references: [id], onDelete: Cascade)
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([inventoryCheckId])
+  @@index([productId])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  rating     Int      // 1-5
+  comment    String?
+  productId  String
+  customerId String
+
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([productId])
+  @@index([customerId])
+}
+
+enum CustomRequestStatus {
+  PENDING
+  QUOTED
+  ACCEPTED
+  REJECTED
+  CANCELED
+}
+
+model CustomRequest {
+  id              String              @id @default(cuid())
+  customerId      String
+  description     String
+  referenceImages String[]            @default([])
+  desiredDate     String
+  status          CustomRequestStatus @default(PENDING)
+  priceQuote      Int?
+  adminNote       String?
+
+  customer        Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model Coupon {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  discount    Int      // Amount or percentage? Let's assume absolute amount for now
+  isPercent   Boolean  @default(false)
+  minOrder    Int      @default(0)
+  maxUses     Int      @default(1)
+  usedCount   Int      @default(0)
+  expiresAt   DateTime?
+  active      Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([code])
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String
+  image     String?
+  active    Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+}

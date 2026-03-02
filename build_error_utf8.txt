@@ -1,0 +1,139 @@
+﻿
+> server@0.0.1 build
+> nest build
+
+npm : [96msrc/stats/
+analytics.controller.
+ts[0m:[93m4[0m:[9
+3m34[0m - 
+[91merror[0m[90m 
+TS2307: [0mCannot 
+find module '../permi
+ssions/permissions.gu
+ard' or its 
+corresponding type 
+declarations.
+At line:1 char:1
++ npm run build > 
+build_error.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: ([96msr   
+ c/stats/...e dec    
+larations.:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+
+[7m4[0m import { 
+PermissionsGuard } 
+from "../permissions/
+permissions.guard";
+[7m [0m [91m      
+                     
+      ~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~[
+0m
+[96msrc/stats/analyt
+ics.controller.ts[0m
+:[93m5[0m:[93m34[
+0m - 
+[91merror[0m[90m 
+TS2307: [0mCannot 
+find module '../permi
+ssions/permissions.de
+corator' or its 
+corresponding type 
+declarations.
+
+[7m5[0m import { 
+CheckPermissions } 
+from "../permissions/
+permissions.decorator
+";
+[7m [0m [91m      
+                     
+      ~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~[0m
+[96msrc/stats/analyt
+ics.controller.ts[0m
+:[93m6[0m:[93m10[
+0m - 
+[91merror[0m[90m 
+TS2305: [0mModule 
+'"@prisma/client"' 
+has no exported 
+member 
+'PermissionAction'.
+
+[7m6[0m import { 
+PermissionAction, 
+PermissionSubject } 
+from 
+"@prisma/client";
+[7m [0m [91m      
+   
+~~~~~~~~~~~~~~~~[0m
+[96msrc/stats/analyt
+ics.controller.ts[0m
+:[93m6[0m:[93m28[
+0m - 
+[91merror[0m[90m 
+TS2305: [0mModule 
+'"@prisma/client"' 
+has no exported 
+member 
+'PermissionSubject'.
+
+[7m6[0m import { 
+PermissionAction, 
+PermissionSubject } 
+from 
+"@prisma/client";
+[7m [0m [91m      
+                     
+~~~~~~~~~~~~~~~~~[0m
+[96msrc/stats/analyt
+ics.service.ts[0m:[
+93m58[0m:[93m30[0m
+ - 
+[91merror[0m[90m 
+TS2322: [0mType 
+'string | null' is 
+not assignable to 
+type 'string | 
+undefined'.
+  Type 'null' is not 
+assignable to type 
+'string | undefined'.
+
+[7m58[0m           
+          where: { 
+id: p.productId },
+[7m  [0m [91m     
+                     
+   ~~[0m
+
+  [96mnode_modules/.
+prisma/client/index.d
+.ts[0m:[93m44898[0
+m:[93m5[0m
+    [7m44898[0m    
+ id?: string
+    [7m     [0m 
+[96m    ~~[0m
+    The expected 
+type comes from 
+property 'id' which 
+is declared here on 
+type 'ProductWhereUni
+queInput'
+
+Found 5 error(s).
+
