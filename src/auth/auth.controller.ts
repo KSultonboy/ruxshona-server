@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshDto } from "./dto/refresh.dto";
@@ -11,7 +11,11 @@ export class AuthController {
 
   @Post("login")
   login(@Body() dto: LoginDto) {
-    return this.auth.login(dto.username, dto.password);
+    const username = dto.username?.trim() || dto.login?.trim();
+    if (!username || !dto.password?.trim()) {
+      throw new BadRequestException("login and password required");
+    }
+    return this.auth.login(username, dto.password);
   }
 
   @Post("refresh")

@@ -35,6 +35,9 @@ export class AuthService implements OnModuleInit {
       accessTokenExpiresAt: access.expiresAt,
       refreshToken: refresh.token,
       refreshTokenExpiresAt: refresh.expiresAt,
+      // Legacy compatibility for older clients
+      token: access.token,
+      refresh: refresh.token,
       user: this.safeUser(user),
     };
   }
@@ -65,6 +68,9 @@ export class AuthService implements OnModuleInit {
       accessTokenExpiresAt: access.expiresAt,
       refreshToken: refresh.token,
       refreshTokenExpiresAt: refresh.expiresAt,
+      // Legacy compatibility for older clients
+      token: access.token,
+      refresh: refresh.token,
       user: this.safeUser(existing.user),
     };
   }
