@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterPushTokenDto } from './dto/register-push-token.dto';
 
@@ -7,7 +7,7 @@ import { RegisterPushTokenDto } from './dto/register-push-token.dto';
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async register(userId: string, dto: RegisterPushTokenDto) {
     return this.prisma.pushToken.upsert({
@@ -27,7 +27,9 @@ export class NotificationsService {
   }
 
   async sendTest(userId: string, title: string, body: string) {
-    this.logger.log(`Sending test notification to user ${userId}: ${title} - ${body}`);
+    this.logger.log(
+      `Sending test notification to user ${userId}: ${title} - ${body}`,
+    );
     // Mock push notification logic
     return { success: true };
   }
@@ -44,11 +46,16 @@ export class NotificationsService {
     return this.sendSMS(phone, text);
   }
 
-  async notifyOrderStatusChanged(phone: string, trackCode: string, status: OrderStatus) {
-    let statusText = "holati yangilandi";
-    if (status === OrderStatus.IN_DELIVERY) statusText = "qabul qilindi va yo'lga chiqarildi";
-    if (status === OrderStatus.DELIVERED) statusText = "yetkazib berildi";
-    if (status === OrderStatus.CANCELED) statusText = "bekor qilindi";
+  async notifyOrderStatusChanged(
+    phone: string,
+    trackCode: string,
+    status: OrderStatus,
+  ) {
+    let statusText = 'holati yangilandi';
+    if (status === OrderStatus.IN_DELIVERY)
+      statusText = "qabul qilindi va yo'lga chiqarildi";
+    if (status === OrderStatus.DELIVERED) statusText = 'yetkazib berildi';
+    if (status === OrderStatus.CANCELED) statusText = 'bekor qilindi';
     const text = `Ruxshona Tort: Buyurtmangiz ${statusText}. Kod: ${trackCode}.`;
     return this.sendSMS(phone, text);
   }

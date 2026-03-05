@@ -1,8 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateStockMovementDto } from "./dto/create-stock-movement.dto";
-import { StockMovementType } from "@prisma/client";
-import { isISODate } from "../utils/date";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
+import { StockMovementType } from '@prisma/client';
+import { isISODate } from '../utils/date';
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -10,7 +14,7 @@ function todayISO() {
 
 @Injectable()
 export class WarehouseService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async summary() {
     const [totalProducts, stockSum, products] = await Promise.all([
@@ -44,7 +48,7 @@ export class WarehouseService {
 
   list(limit?: number) {
     return this.prisma.stockMovement.findMany({
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
       take: limit && limit > 0 ? Math.min(limit, 50) : 20,
       include: {
         product: {
@@ -60,11 +64,13 @@ export class WarehouseService {
   }
 
   async createMovement(dto: CreateStockMovementDto) {
-    const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
-    if (!product) throw new NotFoundException("Product not found");
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+    });
+    if (!product) throw new NotFoundException('Product not found');
 
     const date = dto.date ?? todayISO();
-    if (!isISODate(date)) throw new BadRequestException("Invalid date");
+    if (!isISODate(date)) throw new BadRequestException('Invalid date');
     const note = dto.note?.trim() || null;
     return this.prisma.$transaction(async (tx) => {
       const movement = await tx.stockMovement.create({
@@ -84,7 +90,7 @@ export class WarehouseService {
           data: { stock: { decrement: dto.quantity } },
         });
         if (updated.count !== 1) {
-          throw new BadRequestException("Insufficient stock");
+          throw new BadRequestException('Insufficient stock');
         }
       } else {
         await tx.product.update({

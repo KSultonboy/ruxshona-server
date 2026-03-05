@@ -5,9 +5,9 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-    imports: [PrismaModule, AuthModule],
-    controllers: [InventoryController],
-    providers: [InventoryService],
-    exports: [InventoryService],
+  imports: [PrismaModule, AuthModule],
+  controllers: [InventoryController],
+  providers: [InventoryService],
+  exports: [InventoryService],
 })
-export class InventoryModule { }
+export class InventoryModule {}

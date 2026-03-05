@@ -1,16 +1,25 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
-import { UsersService } from "./users.service";
-import { CreateUserDto } from "./dto/create-user.dto";
-import { UpdateUserDto } from "./dto/update-user.dto";
-import { AuthGuard } from "../auth/guards/auth.guard";
-import { AccessGuard } from "../auth/guards/access.guard";
-import { Roles } from "../auth/decorators/roles.decorator";
-import { Permissions } from "../auth/decorators/permissions.decorator";
-import { Permission } from "@prisma/client";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { UsersService } from './users.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { AuthGuard } from '../auth/guards/auth.guard';
+import { AccessGuard } from '../auth/guards/access.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Permissions } from '../auth/decorators/permissions.decorator';
+import { Permission } from '@prisma/client';
 
-@Controller("users")
+@Controller('users')
 @UseGuards(AuthGuard, AccessGuard)
-@Roles("ADMIN")
+@Roles('ADMIN')
 export class UsersController {
   constructor(private service: UsersService) {}
 
@@ -26,15 +35,15 @@ export class UsersController {
     return this.service.create(dto);
   }
 
-  @Patch(":id")
+  @Patch(':id')
   @Permissions(Permission.USERS_WRITE)
-  update(@Param("id") id: string, @Body() dto: UpdateUserDto) {
+  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.service.update(id, dto);
   }
 
-  @Delete(":id")
+  @Delete(':id')
   @Permissions(Permission.USERS_WRITE)
-  remove(@Param("id") id: string) {
+  remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
 }

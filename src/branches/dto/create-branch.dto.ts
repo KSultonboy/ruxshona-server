@@ -1,5 +1,5 @@
-import { BranchWarehouseMode } from "@prisma/client";
-import { IsEnum, IsOptional, IsString, MinLength } from "class-validator";
+import { BranchWarehouseMode } from '@prisma/client';
+import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateBranchDto {
   @IsString()

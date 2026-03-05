@@ -1,10 +1,10 @@
-declare module "expo-server-sdk" {
+declare module 'expo-server-sdk' {
   export type ExpoPushMessage = {
     to: string | string[];
     title?: string;
     body?: string;
     data?: Record<string, unknown>;
-    sound?: "default" | null;
+    sound?: 'default' | null;
   };
 
   export class Expo {

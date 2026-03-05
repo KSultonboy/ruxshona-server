@@ -1,5 +1,12 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from "class-validator";
-import { AlertRuleType } from "@prisma/client";
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
+import { AlertRuleType } from '@prisma/client';
 
 export class CreateAlertRuleDto {
   @IsEnum(AlertRuleType)

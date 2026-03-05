@@ -1,31 +1,41 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateExpenseDto } from "./dto/create-expense.dto";
-import { UpdateExpenseDto } from "./dto/update-expense.dto";
-import { isISODate } from "../utils/date";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateExpenseDto } from './dto/create-expense.dto';
+import { UpdateExpenseDto } from './dto/update-expense.dto';
+import { isISODate } from '../utils/date';
 
 @Injectable()
 export class ExpensesService {
-    constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
-    list() {
-        return this.prisma.expense.findMany({
-            orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-            include: { expenseItem: true },
-        });
-    }
+  list() {
+    return this.prisma.expense.findMany({
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+      include: { expenseItem: true },
+    });
+  }
 
   async create(dto: CreateExpenseDto) {
-    if (!isISODate(dto.date)) throw new BadRequestException("Invalid date");
+    if (!isISODate(dto.date)) throw new BadRequestException('Invalid date');
     try {
-      const category = await this.prisma.expenseCategory.findUnique({ where: { id: dto.categoryId } });
-      if (!category) throw new BadRequestException("Expense category not found");
+      const category = await this.prisma.expenseCategory.findUnique({
+        where: { id: dto.categoryId },
+      });
+      if (!category)
+        throw new BadRequestException('Expense category not found');
 
-      if (!dto.expenseItemId) throw new BadRequestException("Expense item required");
-      const expenseItem = await this.prisma.expenseItem.findUnique({ where: { id: dto.expenseItemId } });
-      if (!expenseItem) throw new BadRequestException("Expense item not found");
+      if (!dto.expenseItemId)
+        throw new BadRequestException('Expense item required');
+      const expenseItem = await this.prisma.expenseItem.findUnique({
+        where: { id: dto.expenseItemId },
+      });
+      if (!expenseItem) throw new BadRequestException('Expense item not found');
       if (expenseItem.categoryId !== dto.categoryId) {
-        throw new BadRequestException("Expense item category mismatch");
+        throw new BadRequestException('Expense item category mismatch');
       }
 
       const baseData: any = {
@@ -37,14 +47,22 @@ export class ExpensesService {
         expenseItemId: dto.expenseItemId,
       };
 
-      if (category.type === "SELLABLE") {
+      if (category.type === 'SELLABLE') {
         const productId = expenseItem.productId;
-        if (!productId) throw new BadRequestException("Product required for sellable expense");
+        if (!productId)
+          throw new BadRequestException(
+            'Product required for sellable expense',
+          );
         const qty = dto.quantity ?? 0;
-        if (qty <= 0) throw new BadRequestException("Quantity required for sellable expense");
+        if (qty <= 0)
+          throw new BadRequestException(
+            'Quantity required for sellable expense',
+          );
 
-        const product = await this.prisma.product.findUnique({ where: { id: productId } });
-        if (!product) throw new BadRequestException("Product not found");
+        const product = await this.prisma.product.findUnique({
+          where: { id: productId },
+        });
+        if (!product) throw new BadRequestException('Product not found');
 
         return await this.prisma.$transaction(async (tx) => {
           const expense = await tx.expense.create({
@@ -59,7 +77,7 @@ export class ExpensesService {
             data: {
               productId,
               date: dto.date,
-              type: "IN",
+              type: 'IN',
               quantity: qty,
               note: `Expense stock in (${category.name})`,
             },
@@ -75,39 +93,53 @@ export class ExpensesService {
       }
 
       if (!dto.amount || dto.amount <= 0) {
-        throw new BadRequestException("Amount required for normal expense");
+        throw new BadRequestException('Amount required for normal expense');
       }
       return await this.prisma.expense.create({ data: baseData });
     } catch (e: any) {
       if (e instanceof BadRequestException) throw e;
-      throw new BadRequestException("Expense create error (check categoryId)");
+      throw new BadRequestException('Expense create error (check categoryId)');
     }
   }
 
   async update(id: string, dto: UpdateExpenseDto) {
     const exists = await this.prisma.expense.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException("Expense not found");
-    if (dto.date && !isISODate(dto.date)) throw new BadRequestException("Invalid date");
+    if (!exists) throw new NotFoundException('Expense not found');
+    if (dto.date && !isISODate(dto.date))
+      throw new BadRequestException('Invalid date');
 
     try {
       const nextCategoryId = dto.categoryId ?? exists.categoryId;
-      const category = await this.prisma.expenseCategory.findUnique({ where: { id: nextCategoryId } });
-      if (!category) throw new BadRequestException("Expense category not found");
+      const category = await this.prisma.expenseCategory.findUnique({
+        where: { id: nextCategoryId },
+      });
+      if (!category)
+        throw new BadRequestException('Expense category not found');
 
-      if (category.type === "SELLABLE") {
+      if (category.type === 'SELLABLE') {
         const nextExpenseItemId = dto.expenseItemId ?? exists.expenseItemId;
-        if (!nextExpenseItemId) throw new BadRequestException("Expense item required");
-        const expenseItem = await this.prisma.expenseItem.findUnique({ where: { id: nextExpenseItemId } });
-        if (!expenseItem) throw new BadRequestException("Expense item not found");
+        if (!nextExpenseItemId)
+          throw new BadRequestException('Expense item required');
+        const expenseItem = await this.prisma.expenseItem.findUnique({
+          where: { id: nextExpenseItemId },
+        });
+        if (!expenseItem)
+          throw new BadRequestException('Expense item not found');
         if (expenseItem.categoryId !== nextCategoryId) {
-          throw new BadRequestException("Expense item category mismatch");
+          throw new BadRequestException('Expense item category mismatch');
         }
 
         const nextProductId = expenseItem.productId;
         const nextQuantity = dto.quantity ?? exists.quantity;
 
-        if (!nextProductId) throw new BadRequestException("Product required for sellable expense");
-        if (!nextQuantity || nextQuantity <= 0) throw new BadRequestException("Quantity required for sellable expense");
+        if (!nextProductId)
+          throw new BadRequestException(
+            'Product required for sellable expense',
+          );
+        if (!nextQuantity || nextQuantity <= 0)
+          throw new BadRequestException(
+            'Quantity required for sellable expense',
+          );
 
         return await this.prisma.$transaction(async (tx) => {
           await tx.expense.update({
@@ -118,7 +150,8 @@ export class ExpensesService {
               expenseItemId: nextExpenseItemId,
               productId: nextProductId,
               quantity: nextQuantity,
-              note: dto.note === undefined ? undefined : dto.note?.trim() || null,
+              note:
+                dto.note === undefined ? undefined : dto.note?.trim() || null,
             },
           });
 
@@ -134,7 +167,7 @@ export class ExpensesService {
               data: {
                 productId: prevProductId,
                 date: dto.date ?? exists.date,
-                type: "OUT",
+                type: 'OUT',
                 quantity: prevQuantity,
                 note: `Expense update out (${category.name})`,
               },
@@ -147,7 +180,7 @@ export class ExpensesService {
               data: {
                 productId: nextProductId,
                 date: dto.date ?? exists.date,
-                type: "IN",
+                type: 'IN',
                 quantity: nextQuantity,
                 note: `Expense update in (${category.name})`,
               },
@@ -155,7 +188,7 @@ export class ExpensesService {
           } else {
             const diff = nextQuantity - prevQuantity;
             if (diff !== 0) {
-              const type = diff > 0 ? "IN" : "OUT";
+              const type = diff > 0 ? 'IN' : 'OUT';
               await tx.product.update({
                 where: { id: nextProductId },
                 data: { stock: { increment: diff } },
@@ -177,16 +210,19 @@ export class ExpensesService {
       }
 
       const nextExpenseItemId = dto.expenseItemId ?? exists.expenseItemId;
-      if (!nextExpenseItemId) throw new BadRequestException("Expense item required");
-      const expenseItem = await this.prisma.expenseItem.findUnique({ where: { id: nextExpenseItemId } });
-      if (!expenseItem) throw new BadRequestException("Expense item not found");
+      if (!nextExpenseItemId)
+        throw new BadRequestException('Expense item required');
+      const expenseItem = await this.prisma.expenseItem.findUnique({
+        where: { id: nextExpenseItemId },
+      });
+      if (!expenseItem) throw new BadRequestException('Expense item not found');
       if (expenseItem.categoryId !== nextCategoryId) {
-        throw new BadRequestException("Expense item category mismatch");
+        throw new BadRequestException('Expense item category mismatch');
       }
 
       const nextAmount = dto.amount ?? exists.amount;
       if (!nextAmount || nextAmount <= 0) {
-        throw new BadRequestException("Amount required for normal expense");
+        throw new BadRequestException('Amount required for normal expense');
       }
 
       await this.prisma.expense.update({
@@ -203,13 +239,13 @@ export class ExpensesService {
       });
       return { ok: true };
     } catch {
-      throw new BadRequestException("Expense update error");
+      throw new BadRequestException('Expense update error');
     }
   }
 
   async remove(id: string) {
     const exists = await this.prisma.expense.findUnique({ where: { id } });
-    if (!exists) throw new NotFoundException("Expense not found");
+    if (!exists) throw new NotFoundException('Expense not found');
     if (exists.productId && exists.quantity && exists.quantity > 0) {
       await this.prisma.$transaction(async (tx) => {
         await tx.expense.delete({ where: { id } });
@@ -221,9 +257,9 @@ export class ExpensesService {
           data: {
             productId: exists.productId as string,
             date: exists.date,
-            type: "OUT",
+            type: 'OUT',
             quantity: exists.quantity as number,
-            note: "Expense deleted (stock rollback)",
+            note: 'Expense deleted (stock rollback)',
           },
         });
       });

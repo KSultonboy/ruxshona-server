@@ -1,4 +1,4 @@
-import { Type } from "class-transformer";
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -9,8 +9,8 @@ import {
   Matches,
   Min,
   ValidateNested,
-} from "class-validator";
-import { OrderChannel } from "@prisma/client";
+} from 'class-validator';
+import { OrderChannel } from '@prisma/client';
 
 export class CreateOrderItemDto {
   @IsOptional()

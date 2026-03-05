@@ -1,17 +1,21 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { OrderChannel, OrderStatus, Prisma, ProductType } from "@prisma/client";
-import { NotificationsService } from "../notifications/notifications.service";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateOrderDto } from "./dto/create-order.dto";
-import { CreatePublicOrderDto } from "./dto/create-public-order.dto";
-import { isISODate } from "../utils/date";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { OrderChannel, OrderStatus, Prisma, ProductType } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateOrderDto } from './dto/create-order.dto';
+import { CreatePublicOrderDto } from './dto/create-public-order.dto';
+import { isISODate } from '../utils/date';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private prisma: PrismaService,
-    private notifications: NotificationsService
-  ) { }
+    private notifications: NotificationsService,
+  ) {}
 
   private todayISO() {
     return new Date().toISOString().slice(0, 10);
@@ -38,13 +42,13 @@ export class OrdersService {
       });
       if (!exists) return code;
     }
-    throw new BadRequestException("Track code generation error");
+    throw new BadRequestException('Track code generation error');
   }
 
   async list(status?: OrderStatus) {
     return this.prisma.order.findMany({
       where: status ? { status } : undefined,
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       include: {
         items: true,
       },
@@ -52,17 +56,21 @@ export class OrdersService {
   }
 
   async create(dto: CreateOrderDto, userId: string) {
-    if (!dto.customerName?.trim()) throw new BadRequestException("Customer name required");
-    if (!dto.total || dto.total <= 0) throw new BadRequestException("Total must be greater than zero");
+    if (!dto.customerName?.trim())
+      throw new BadRequestException('Customer name required');
+    if (!dto.total || dto.total <= 0)
+      throw new BadRequestException('Total must be greater than zero');
 
     const date = dto.date ?? this.todayISO();
-    if (!isISODate(date)) throw new BadRequestException("Invalid date");
+    if (!isISODate(date)) throw new BadRequestException('Invalid date');
 
     const items = dto.items?.map((item) => {
       const quantity = Number(item.quantity);
-      if (!Number.isFinite(quantity) || quantity <= 0) throw new BadRequestException("Invalid item quantity");
+      if (!Number.isFinite(quantity) || quantity <= 0)
+        throw new BadRequestException('Invalid item quantity');
       const unitPrice = Number(item.unitPrice);
-      if (!Number.isInteger(unitPrice) || unitPrice < 0) throw new BadRequestException("Invalid item price");
+      if (!Number.isInteger(unitPrice) || unitPrice < 0)
+        throw new BadRequestException('Invalid item price');
 
       return {
         productId: item.productId ?? null,
@@ -73,7 +81,7 @@ export class OrdersService {
       };
     });
 
-    const source = dto.source?.trim() || "ERP";
+    const source = dto.source?.trim() || 'ERP';
 
     return this.prisma.order.create({
       data: {
@@ -97,8 +105,11 @@ export class OrdersService {
   }
 
   async updateStatus(id: string, status: OrderStatus) {
-    const exists = await this.prisma.order.findUnique({ where: { id }, select: { id: true } });
-    if (!exists) throw new NotFoundException("Order not found");
+    const exists = await this.prisma.order.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!exists) throw new NotFoundException('Order not found');
 
     const next = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.update({
@@ -107,14 +118,22 @@ export class OrdersService {
         include: { items: true },
       });
 
-      if (status === OrderStatus.DELIVERED && order.customerId && order.total > 0) {
+      if (
+        status === OrderStatus.DELIVERED &&
+        order.customerId &&
+        order.total > 0
+      ) {
         const pointsToAdd = Math.floor(order.total * 0.01);
         if (pointsToAdd > 0) {
           const updatedCustomer = await tx.customer.update({
             where: { id: order.customerId },
             data: { points: { increment: pointsToAdd } },
           });
-          await this.notifications.notifyPointsEarned(updatedCustomer.phone, pointsToAdd, updatedCustomer.points);
+          await this.notifications.notifyPointsEarned(
+            updatedCustomer.phone,
+            pointsToAdd,
+            updatedCustomer.points,
+          );
         }
       }
 
@@ -122,7 +141,11 @@ export class OrdersService {
     });
 
     if (next.phone) {
-      await this.notifications.notifyOrderStatusChanged(next.phone, next.trackCode || next.id, status);
+      await this.notifications.notifyOrderStatusChanged(
+        next.phone,
+        next.trackCode || next.id,
+        status,
+      );
     }
 
     return next;
@@ -138,7 +161,7 @@ export class OrdersService {
           },
         },
       },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
       select: {
         id: true,
         name: true,
@@ -146,7 +169,12 @@ export class OrdersService {
     });
   }
 
-  async listPublicProducts(filters: { categoryId?: string; q?: string; minPrice?: number; maxPrice?: number }) {
+  async listPublicProducts(filters: {
+    categoryId?: string;
+    q?: string;
+    minPrice?: number;
+    maxPrice?: number;
+  }) {
     const where: Prisma.ProductWhereInput = {
       type: ProductType.PRODUCT,
       active: true,
@@ -156,7 +184,7 @@ export class OrdersService {
     if (filters.q?.trim()) {
       where.name = {
         contains: filters.q.trim(),
-        mode: "insensitive",
+        mode: 'insensitive',
       };
     }
 
@@ -190,7 +218,7 @@ export class OrdersService {
 
     const items = await this.prisma.product.findMany({
       where,
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
       select: {
         id: true,
         name: true,
@@ -211,10 +239,13 @@ export class OrdersService {
   }
 
   async createPublic(dto: CreatePublicOrderDto) {
-    if (!dto.customerName?.trim()) throw new BadRequestException("Customer name required");
-    if (!dto.items?.length) throw new BadRequestException("Items are required");
+    if (!dto.customerName?.trim())
+      throw new BadRequestException('Customer name required');
+    if (!dto.items?.length) throw new BadRequestException('Items are required');
 
-    const uniqueProductIds = Array.from(new Set(dto.items.map((item) => item.productId)));
+    const uniqueProductIds = Array.from(
+      new Set(dto.items.map((item) => item.productId)),
+    );
     const products = await this.prisma.product.findMany({
       where: {
         id: { in: uniqueProductIds },
@@ -232,7 +263,8 @@ export class OrdersService {
     const productMap = new Map(products.map((item) => [item.id, item]));
     const orderItems = dto.items.map((item) => {
       const product = productMap.get(item.productId);
-      if (!product) throw new BadRequestException(`Product not found: ${item.productId}`);
+      if (!product)
+        throw new BadRequestException(`Product not found: ${item.productId}`);
 
       const quantity = Number(item.quantity);
       if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -241,7 +273,9 @@ export class OrdersService {
 
       const unitPrice = product.salePrice ?? product.price ?? 0;
       if (unitPrice <= 0) {
-        throw new BadRequestException(`Product price is invalid: ${product.name}`);
+        throw new BadRequestException(
+          `Product price is invalid: ${product.name}`,
+        );
       }
 
       return {
@@ -254,7 +288,10 @@ export class OrdersService {
     });
 
     return this.prisma.$transaction(async (tx) => {
-      let finalTotal = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
+      let finalTotal = orderItems.reduce(
+        (sum, item) => sum + item.lineTotal,
+        0,
+      );
       let noteExtra = dto.note ? this.normalize(dto.note) : null;
 
       if (dto.couponCode) {
@@ -263,18 +300,30 @@ export class OrdersService {
         });
         if (coupon) {
           if (!coupon.expiresAt || coupon.expiresAt > new Date()) {
-            if (coupon.usedCount < coupon.maxUses && finalTotal >= coupon.minOrder) {
-              const discount = coupon.isPercent ? Math.floor(finalTotal * (coupon.discount / 100)) : coupon.discount;
+            if (
+              coupon.usedCount < coupon.maxUses &&
+              finalTotal >= coupon.minOrder
+            ) {
+              const discount = coupon.isPercent
+                ? Math.floor(finalTotal * (coupon.discount / 100))
+                : coupon.discount;
               finalTotal = Math.max(0, finalTotal - discount);
-              await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
-              noteExtra = noteExtra ? `${noteExtra} (Coupon: ${coupon.code})` : `(Coupon: ${coupon.code})`;
+              await tx.coupon.update({
+                where: { id: coupon.id },
+                data: { usedCount: { increment: 1 } },
+              });
+              noteExtra = noteExtra
+                ? `${noteExtra} (Coupon: ${coupon.code})`
+                : `(Coupon: ${coupon.code})`;
             }
           }
         }
       }
 
       if (dto.pointsToUse && dto.pointsToUse > 0 && dto.customerId) {
-        const customer = await tx.customer.findUnique({ where: { id: dto.customerId } });
+        const customer = await tx.customer.findUnique({
+          where: { id: dto.customerId },
+        });
         if (customer && customer.points >= dto.pointsToUse) {
           const discount = Math.min(finalTotal, dto.pointsToUse);
           finalTotal -= discount;
@@ -282,7 +331,9 @@ export class OrdersService {
             where: { id: dto.customerId },
             data: { points: { decrement: discount } },
           });
-          noteExtra = noteExtra ? `${noteExtra} (Points used: ${discount})` : `(Points used: ${discount})`;
+          noteExtra = noteExtra
+            ? `${noteExtra} (Points used: ${discount})`
+            : `(Points used: ${discount})`;
         }
       }
 
@@ -293,7 +344,7 @@ export class OrdersService {
           customerName: dto.customerName.trim(),
           phone: this.normalize(dto.phone),
           address: this.normalize(dto.address),
-          source: "WEBSITE",
+          source: 'WEBSITE',
           channel: OrderChannel.WEBSITE,
           status: OrderStatus.NEW,
           total: finalTotal,
@@ -314,7 +365,11 @@ export class OrdersService {
       });
 
       if (order.phone) {
-        await this.notifications.notifyOrderCreated(order.phone, order.trackCode || order.id, order.total);
+        await this.notifications.notifyOrderCreated(
+          order.phone,
+          order.trackCode || order.id,
+          order.total,
+        );
       }
       return order;
     });

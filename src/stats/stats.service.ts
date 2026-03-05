@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { ReturnStatus } from "@prisma/client";
-import { PrismaService } from "../prisma/prisma.service";
+import { Injectable } from '@nestjs/common';
+import { ReturnStatus } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 type StatsOverview = {
   productsCount: number;
@@ -33,7 +33,14 @@ export class StatsService {
           }
         : undefined;
 
-    const [productsCount, categoriesCount, expensesCount, branches, shops, workersCount] = await Promise.all([
+    const [
+      productsCount,
+      categoriesCount,
+      expensesCount,
+      branches,
+      shops,
+      workersCount,
+    ] = await Promise.all([
       this.prisma.product.count(),
       this.prisma.productCategory.count(),
       this.prisma.expense.count({ where: dateFilter }),
@@ -55,7 +62,10 @@ export class StatsService {
       where: dateFilter,
       select: { price: true, quantity: true },
     });
-    const revenue = sales.reduce((sum, sale) => sum + sale.price * sale.quantity, 0);
+    const revenue = sales.reduce(
+      (sum, sale) => sum + sale.price * sale.quantity,
+      0,
+    );
 
     const returnItems = await this.prisma.returnItem.findMany({
       where: {

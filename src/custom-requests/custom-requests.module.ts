@@ -5,9 +5,9 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-    imports: [PrismaModule, AuthModule],
-    controllers: [CustomRequestsController],
-    providers: [CustomRequestsService],
-    exports: [CustomRequestsService],
+  imports: [PrismaModule, AuthModule],
+  controllers: [CustomRequestsController],
+  providers: [CustomRequestsService],
+  exports: [CustomRequestsService],
 })
-export class CustomRequestsModule { }
+export class CustomRequestsModule {}

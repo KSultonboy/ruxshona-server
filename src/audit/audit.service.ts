@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 export type AuditCreateInput = {
   action: string;
@@ -14,7 +14,7 @@ export type AuditCreateInput = {
 
 @Injectable()
 export class AuditService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async create(input: AuditCreateInput) {
     try {
@@ -35,7 +35,15 @@ export class AuditService {
     }
   }
 
-  async list(filters: { from?: string; to?: string; entity?: string; userId?: string; action?: string; skip?: number; take?: number }) {
+  async list(filters: {
+    from?: string;
+    to?: string;
+    entity?: string;
+    userId?: string;
+    action?: string;
+    skip?: number;
+    take?: number;
+  }) {
     const where: any = {};
     if (filters.entity) where.entity = filters.entity;
     if (filters.userId) where.userId = filters.userId;
@@ -49,7 +57,7 @@ export class AuditService {
     const [items, total] = await Promise.all([
       this.prisma.auditLog.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         include: { user: { select: { id: true, username: true, role: true } } },
         skip: filters.skip ?? 0,
         take: filters.take ?? 50,

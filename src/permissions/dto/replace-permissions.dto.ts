@@ -1,6 +1,12 @@
-import { IsArray, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
-import { Type } from "class-transformer";
-import { Permission } from "@prisma/client";
+import {
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { Permission } from '@prisma/client';
 
 class PermissionItemDto {
   @IsEnum(Permission)

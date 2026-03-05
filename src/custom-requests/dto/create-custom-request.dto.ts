@@ -1,14 +1,14 @@
-import { IsString, IsArray, IsOptional, IsDateString } from "class-validator";
+import { IsString, IsArray, IsOptional, IsDateString } from 'class-validator';
 
 export class CreateCustomRequestDto {
-    @IsString()
-    description: string;
+  @IsString()
+  description: string;
 
-    @IsArray()
-    @IsString({ each: true })
-    @IsOptional()
-    referenceImages?: string[];
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  referenceImages?: string[];
 
-    @IsDateString()
-    desiredDate: string;
+  @IsDateString()
+  desiredDate: string;
 }

@@ -154,7 +154,8 @@ CREATE TABLE "public"."StockMovement" (
     "id" TEXT NOT NULL,
     "date" VARCHAR(10) NOT NULL,
     "type" "public"."StockMovementType" NOT NULL,
-    "quantity" INTEGER NOT NULL,`r`n    "note" TEXT,
+    "quantity" INTEGER NOT NULL,
+    "note" TEXT,
     "productId" TEXT NOT NULL,
     "createdById" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -184,7 +185,10 @@ CREATE TABLE "public"."Transfer" (
 CREATE TABLE "public"."TransferItem" (
     "id" TEXT NOT NULL,
     "transferId" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,`r`n    "quantity" INTEGER NOT NULL,`r`n`r`n    CONSTRAINT "TransferItem_pkey" PRIMARY KEY ("id")
+    "productId" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL,
+
+    CONSTRAINT "TransferItem_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -208,7 +212,10 @@ CREATE TABLE "public"."Return" (
 CREATE TABLE "public"."ReturnItem" (
     "id" TEXT NOT NULL,
     "returnId" TEXT NOT NULL,
-    "productId" TEXT NOT NULL,`r`n    "quantity" INTEGER NOT NULL,`r`n`r`n    CONSTRAINT "ReturnItem_pkey" PRIMARY KEY ("id")
+    "productId" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL,
+
+    CONSTRAINT "ReturnItem_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -712,6 +719,7 @@ ALTER TABLE "public"."InventoryCheckItem" ADD CONSTRAINT "InventoryCheckItem_inv
 
 -- AddForeignKey
 ALTER TABLE "public"."InventoryCheckItem" ADD CONSTRAINT "InventoryCheckItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
 
 
 

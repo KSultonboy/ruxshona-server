@@ -1,6 +1,13 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Matches, Min } from "class-validator";
-import { PaymentMethod } from "@prisma/client";
-import { Type } from "class-transformer";
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Min,
+} from 'class-validator';
+import { PaymentMethod } from '@prisma/client';
+import { Type } from 'class-transformer';
 
 export class CreateSaleDto {
   @IsString()
@@ -9,7 +16,7 @@ export class CreateSaleDto {
   @Type(() => Number)
   @IsNumber(
     { maxDecimalPlaces: 3, allowInfinity: false, allowNaN: false },
-    { message: "quantity must be a valid number with up to 3 decimal places" }
+    { message: 'quantity must be a valid number with up to 3 decimal places' },
   )
   @Min(0.001)
   quantity: number;

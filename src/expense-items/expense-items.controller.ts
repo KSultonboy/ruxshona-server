@@ -1,22 +1,32 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
-import { ExpenseItemsService } from "./expense-items.service";
-import { CreateExpenseItemDto } from "./dto/create-expense-item.dto";
-import { UpdateExpenseItemDto } from "./dto/update-expense-item.dto";
-import { AuthGuard } from "../auth/guards/auth.guard";
-import { AccessGuard } from "../auth/guards/access.guard";
-import { Roles } from "../auth/decorators/roles.decorator";
-import { Permissions } from "../auth/decorators/permissions.decorator";
-import { Permission } from "@prisma/client";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ExpenseItemsService } from './expense-items.service';
+import { CreateExpenseItemDto } from './dto/create-expense-item.dto';
+import { UpdateExpenseItemDto } from './dto/update-expense-item.dto';
+import { AuthGuard } from '../auth/guards/auth.guard';
+import { AccessGuard } from '../auth/guards/access.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Permissions } from '../auth/decorators/permissions.decorator';
+import { Permission } from '@prisma/client';
 
-@Controller("expense-items")
+@Controller('expense-items')
 @UseGuards(AuthGuard, AccessGuard)
-@Roles("ADMIN")
+@Roles('ADMIN')
 export class ExpenseItemsController {
   constructor(private service: ExpenseItemsService) {}
 
   @Get()
   @Permissions(Permission.EXPENSES_READ)
-  list(@Query("categoryId") categoryId?: string) {
+  list(@Query('categoryId') categoryId?: string) {
     return this.service.list(categoryId);
   }
 
@@ -26,15 +36,15 @@ export class ExpenseItemsController {
     return this.service.create(dto);
   }
 
-  @Patch(":id")
+  @Patch(':id')
   @Permissions(Permission.EXPENSES_WRITE)
-  update(@Param("id") id: string, @Body() dto: UpdateExpenseItemDto) {
+  update(@Param('id') id: string, @Body() dto: UpdateExpenseItemDto) {
     return this.service.update(id, dto);
   }
 
-  @Delete(":id")
+  @Delete(':id')
   @Permissions(Permission.EXPENSES_WRITE)
-  remove(@Param("id") id: string) {
+  remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
 }

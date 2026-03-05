@@ -1,13 +1,18 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from "@nestjs/common";
-import { Reflector } from "@nestjs/core";
-import type { Request } from "express";
-import { PrismaService } from "../../prisma/prisma.service";
-import { ROLES_KEY } from "../decorators/roles.decorator";
-import { PERMISSIONS_KEY } from "../decorators/permissions.decorator";
-import type { Permission, UserRole } from "@prisma/client";
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import type { Request } from 'express';
+import { PrismaService } from '../../prisma/prisma.service';
+import { ROLES_KEY } from '../decorators/roles.decorator';
+import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import type { Permission, UserRole } from '@prisma/client';
 
 function readString(value: unknown) {
-  return typeof value === "string" ? value : undefined;
+  return typeof value === 'string' ? value : undefined;
 }
 
 function extractBranchId(req: Request) {
@@ -19,32 +24,39 @@ function extractBranchId(req: Request) {
     readString(body.branchId) ??
     readString(query.branchId) ??
     readString(params.branchId) ??
-    (body.sourceType === "BRANCH" ? readString(body.sourceId) : undefined) ??
-    ((req.path?.startsWith("/branches/") && readString(params.id)) || undefined)
+    (body.sourceType === 'BRANCH' ? readString(body.sourceId) : undefined) ??
+    ((req.path?.startsWith('/branches/') && readString(params.id)) || undefined)
   );
 }
 
 @Injectable()
 export class AccessGuard implements CanActivate {
-  constructor(private reflector: Reflector, private prisma: PrismaService) {}
+  constructor(
+    private reflector: Reflector,
+    private prisma: PrismaService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const roles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-    const permissions = this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const permissions = this.reflector.getAllAndOverride<Permission[]>(
+      PERMISSIONS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
-    if ((!roles || roles.length === 0) && (!permissions || permissions.length === 0)) return true;
+    if (
+      (!roles || roles.length === 0) &&
+      (!permissions || permissions.length === 0)
+    )
+      return true;
 
     const req = context.switchToHttp().getRequest<Request>();
     const user = (req as any).user;
-    if (!user) throw new ForbiddenException("Forbidden");
+    if (!user) throw new ForbiddenException('Forbidden');
 
-    if (user.role === "ADMIN") return true;
+    if (user.role === 'ADMIN') return true;
 
     if (permissions && permissions.length > 0) {
       const userId = user.id ?? user.sub;
@@ -67,10 +79,11 @@ export class AccessGuard implements CanActivate {
         }
 
         const branchIds = Array.from(candidateBranchIds);
-        const branchConditions: Array<{ branchId: string | null } | { branchId: { in: string[] } }> = [
-          { branchId: null },
-        ];
-        if (branchIds.length) branchConditions.push({ branchId: { in: branchIds } });
+        const branchConditions: Array<
+          { branchId: string | null } | { branchId: { in: string[] } }
+        > = [{ branchId: null }];
+        if (branchIds.length)
+          branchConditions.push({ branchId: { in: branchIds } });
 
         const match = await this.prisma.userPermission.findFirst({
           where: {
@@ -86,7 +99,7 @@ export class AccessGuard implements CanActivate {
           if (roles && roles.length > 0 && roles.includes(user.role)) {
             return true;
           }
-          throw new ForbiddenException("Forbidden");
+          throw new ForbiddenException('Forbidden');
         }
         return true;
       }
@@ -95,7 +108,7 @@ export class AccessGuard implements CanActivate {
     if (roles && roles.length > 0 && roles.includes(user.role)) return true;
 
     if (permissions && permissions.length > 0) {
-      throw new ForbiddenException("Forbidden");
+      throw new ForbiddenException('Forbidden');
     }
 
     return false;

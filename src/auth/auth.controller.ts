@@ -1,42 +1,60 @@
-import { BadRequestException, Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
-import { AuthService } from "./auth.service";
-import { LoginDto } from "./dto/login.dto";
-import { RefreshDto } from "./dto/refresh.dto";
-import { AuthGuard } from "./guards/auth.guard";
-import type { Request } from "express";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
+import { AuthGuard } from './guards/auth.guard';
+import type { Request } from 'express';
 
-@Controller("auth")
+@Controller('auth')
 export class AuthController {
   constructor(private auth: AuthService) {}
 
-  @Post("login")
+  @Post('login')
   login(@Body() dto: LoginDto) {
     const username = dto.username?.trim() || dto.login?.trim();
     if (!username || !dto.password?.trim()) {
-      throw new BadRequestException("login and password required");
+      throw new BadRequestException('login and password required');
     }
     return this.auth.login(username, dto.password);
   }
 
-  @Post("refresh")
+  @Post('refresh')
   refresh(@Body() dto: RefreshDto) {
-    return this.auth.refresh(dto.refreshToken);
+    const refreshToken =
+      dto.refreshToken?.trim() || dto.refresh?.trim() || dto.token?.trim();
+    if (!refreshToken) {
+      throw new BadRequestException('refresh token required');
+    }
+    return this.auth.refresh(refreshToken);
   }
 
-  @Post("logout")
+  @Post('logout')
   logout(@Body() dto: RefreshDto) {
-    return this.auth.logout(dto.refreshToken);
+    const refreshToken =
+      dto.refreshToken?.trim() || dto.refresh?.trim() || dto.token?.trim();
+    if (!refreshToken) {
+      throw new BadRequestException('refresh token required');
+    }
+    return this.auth.logout(refreshToken);
   }
 
   @UseGuards(AuthGuard)
-  @Get("me")
+  @Get('me')
   me(@Req() req: Request) {
     const user = (req as any).user;
     return this.auth.me(user.sub);
   }
 
   @UseGuards(AuthGuard)
-  @Get("permissions")
+  @Get('permissions')
   permissions(@Req() req: Request) {
     const user = (req as any).user;
     return this.auth.permissions(user.sub);
