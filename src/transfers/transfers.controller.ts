@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -55,9 +56,13 @@ export class TransfersController {
   @Delete(':id')
   @Roles('ADMIN', 'PRODUCTION')
   @Permissions(Permission.TRANSFERS_WRITE)
-  remove(@Param('id') id: string, @Req() req: Request) {
+  remove(
+    @Param('id') id: string,
+    @Query('specialCode') specialCode: string | undefined,
+    @Req() req: Request,
+  ) {
     const user = (req as any).user;
-    return this.service.remove(id, { id: user.sub, role: user.role });
+    return this.service.remove(id, { id: user.sub, role: user.role }, specialCode);
   }
 
   @Post(':id/receive')

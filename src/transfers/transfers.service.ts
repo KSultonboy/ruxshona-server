@@ -19,6 +19,8 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const RECEIVED_TRANSFER_SPECIAL_CODE = '2112';
+
 type AuthUser = { id: string; role: UserRole };
 
 type TransferItemInput = { productId: string; quantity: number };
@@ -39,6 +41,65 @@ function normalizeItems(items: TransferItemInput[]) {
 @Injectable()
 export class TransfersService {
   constructor(private prisma: PrismaService) {}
+
+  private async ensureReceivedBranchChangeAllowed(
+    transfer: {
+      branchId: string | null;
+      date: string;
+      items: Array<{ productId: string; quantity: number }>;
+    },
+    specialCode?: string,
+  ) {
+    if (!transfer.branchId) {
+      throw new BadRequestException('Branch not set');
+    }
+
+    if ((specialCode ?? '').trim() !== RECEIVED_TRANSFER_SPECIAL_CODE) {
+      throw new BadRequestException(
+        'Special code required for received transfer changes',
+      );
+    }
+
+    const normalizedItems = normalizeItems(
+      transfer.items.map((item) => ({
+        productId: item.productId,
+        quantity: Number(item.quantity),
+      })),
+    );
+    const productIds = normalizedItems.map((item) => item.productId);
+
+    const soldProduct = await this.prisma.sale.findFirst({
+      where: {
+        branchId: transfer.branchId,
+        productId: { in: productIds },
+        date: { gte: transfer.date },
+      },
+      select: { id: true },
+    });
+    if (soldProduct) {
+      throw new BadRequestException(
+        'Cannot edit or delete: transfer products already sold in branch',
+      );
+    }
+
+    const stocks = await this.prisma.branchStock.findMany({
+      where: {
+        branchId: transfer.branchId,
+        productId: { in: productIds },
+      },
+      select: { productId: true, quantity: true },
+    });
+    const stockMap = new Map(stocks.map((item) => [item.productId, item.quantity]));
+
+    for (const item of normalizedItems) {
+      const available = Number(stockMap.get(item.productId) ?? 0);
+      if (available < item.quantity) {
+        throw new BadRequestException(
+          'Cannot edit or delete: transfer stock already used',
+        );
+      }
+    }
+  }
 
   private async ensureSalesShiftOpen(user: AuthUser) {
     if (user.role !== 'SALES') return;
@@ -187,13 +248,30 @@ export class TransfersService {
     const canEditBranchPending =
       exists.targetType === TransferTargetType.BRANCH &&
       exists.status === TransferStatus.PENDING;
+    const canEditBranchReceived =
+      exists.targetType === TransferTargetType.BRANCH &&
+      exists.status === TransferStatus.RECEIVED;
     const canEditShopReceived =
       exists.targetType === TransferTargetType.SHOP &&
       exists.status === TransferStatus.RECEIVED;
-    if (!canEditBranchPending && !canEditShopReceived) {
+    if (!canEditBranchPending && !canEditBranchReceived && !canEditShopReceived) {
       throw new BadRequestException(
-        'Only pending branch or received shop transfers can be edited',
+        'Only pending/received branch or received shop transfers can be edited',
       );
+    }
+
+    if (
+      canEditBranchReceived &&
+      dto.branchId &&
+      dto.branchId !== exists.branchId
+    ) {
+      throw new BadRequestException(
+        'Branch cannot be changed after transfer is received',
+      );
+    }
+
+    if (canEditBranchReceived) {
+      await this.ensureReceivedBranchChangeAllowed(exists, dto.specialCode);
     }
 
     if (dto.targetType && dto.targetType !== exists.targetType) {
@@ -254,20 +332,70 @@ export class TransfersService {
     const prevItems = normalizeItems(exists.items);
 
     return this.prisma.$transaction(async (tx) => {
-      for (const item of prevItems) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        });
-      }
+      if (canEditBranchReceived) {
+        const receivedBranchId = exists.branchId as string;
 
-      for (const item of nextItems) {
-        const updated = await tx.product.updateMany({
-          where: { id: item.productId, stock: { gte: item.quantity } },
-          data: { stock: { decrement: item.quantity } },
-        });
-        if (updated.count !== 1) {
-          throw new BadRequestException('Insufficient stock');
+        for (const item of prevItems) {
+          const branchUpdated = await tx.branchStock.updateMany({
+            where: {
+              branchId: receivedBranchId,
+              productId: item.productId,
+              quantity: { gte: item.quantity },
+            },
+            data: { quantity: { decrement: item.quantity } },
+          });
+          if (branchUpdated.count !== 1) {
+            throw new BadRequestException(
+              'Cannot edit: transfer stock already used',
+            );
+          }
+
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+
+        for (const item of nextItems) {
+          const updated = await tx.product.updateMany({
+            where: { id: item.productId, stock: { gte: item.quantity } },
+            data: { stock: { decrement: item.quantity } },
+          });
+          if (updated.count !== 1) {
+            throw new BadRequestException('Insufficient stock');
+          }
+
+          await tx.branchStock.upsert({
+            where: {
+              branchId_productId: {
+                branchId: receivedBranchId,
+                productId: item.productId,
+              },
+            },
+            update: { quantity: { increment: item.quantity } },
+            create: {
+              branchId: receivedBranchId,
+              productId: item.productId,
+              quantity: item.quantity,
+            },
+          });
+        }
+      } else {
+        for (const item of prevItems) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+
+        for (const item of nextItems) {
+          const updated = await tx.product.updateMany({
+            where: { id: item.productId, stock: { gte: item.quantity } },
+            data: { stock: { decrement: item.quantity } },
+          });
+          if (updated.count !== 1) {
+            throw new BadRequestException('Insufficient stock');
+          }
         }
       }
 
@@ -298,7 +426,7 @@ export class TransfersService {
     });
   }
 
-  async remove(id: string, user: AuthUser) {
+  async remove(id: string, user: AuthUser, specialCode?: string) {
     if (user.role === 'SALES') {
       throw new ForbiddenException(
         'Only admin or production can delete transfers',
@@ -313,22 +441,58 @@ export class TransfersService {
     const canDeleteBranchPending =
       exists.targetType === TransferTargetType.BRANCH &&
       exists.status === TransferStatus.PENDING;
+    const canDeleteBranchReceived =
+      exists.targetType === TransferTargetType.BRANCH &&
+      exists.status === TransferStatus.RECEIVED;
     const canDeleteShopReceived =
       exists.targetType === TransferTargetType.SHOP &&
       exists.status === TransferStatus.RECEIVED;
-    if (!canDeleteBranchPending && !canDeleteShopReceived) {
+    if (
+      !canDeleteBranchPending &&
+      !canDeleteBranchReceived &&
+      !canDeleteShopReceived
+    ) {
       throw new BadRequestException(
-        'Only pending branch or received shop transfers can be deleted',
+        'Only pending/received branch or received shop transfers can be deleted',
       );
+    }
+
+    if (canDeleteBranchReceived) {
+      await this.ensureReceivedBranchChangeAllowed(exists, specialCode);
     }
 
     return this.prisma.$transaction(async (tx) => {
       const prevItems = normalizeItems(exists.items);
-      for (const item of prevItems) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        });
+      if (canDeleteBranchReceived) {
+        const receivedBranchId = exists.branchId as string;
+
+        for (const item of prevItems) {
+          const branchUpdated = await tx.branchStock.updateMany({
+            where: {
+              branchId: receivedBranchId,
+              productId: item.productId,
+              quantity: { gte: item.quantity },
+            },
+            data: { quantity: { decrement: item.quantity } },
+          });
+          if (branchUpdated.count !== 1) {
+            throw new BadRequestException(
+              'Cannot delete: transfer stock already used',
+            );
+          }
+
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+      } else {
+        for (const item of prevItems) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
       }
       await tx.transfer.delete({ where: { id: exists.id } });
       return { ok: true };
