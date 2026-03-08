@@ -47,11 +47,21 @@ async function bootstrap() {
     'http://tauri.localhost',
     'https://tauri.localhost',
   ];
+  const localDevOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+    'http://localhost:3002',
+    'http://127.0.0.1:3002',
+  ];
   const envOrigins = (process.env.CORS_ORIGIN ?? '')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
-  const allowedOrigins = Array.from(new Set([...envOrigins, ...tauriOrigins]));
+  const allowedOrigins = Array.from(
+    new Set([...envOrigins, ...localDevOrigins, ...tauriOrigins]),
+  );
 
   // CORS (prod-da domen bilan)
   app.enableCors({

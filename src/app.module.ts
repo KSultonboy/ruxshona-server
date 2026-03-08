@@ -34,6 +34,7 @@ import { CustomersModule } from './customers/customers.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { CustomRequestsModule } from './custom-requests/custom-requests.module';
 import { PostsModule } from './posts/posts.module';
+import { TelegramCashbackModule } from './telegram-cashback/telegram-cashback.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { PostsModule } from './posts/posts.module';
     ReviewsModule,
     CustomRequestsModule,
     PostsModule,
+    TelegramCashbackModule,
   ],
   providers: [
     {

@@ -81,6 +81,12 @@ enum OrderChannel {
   OTHER
 }
 
+enum CashbackTransactionType {
+  EARN
+  REDEEM
+  ADJUSTMENT
+}
+
 enum InventoryCheckStatus {
   PENDING
   COMPLETED
@@ -145,6 +151,7 @@ model Branch {
   alertRules   AlertRule[]
   permissions  UserPermission[]
   inventoryChecks InventoryCheck[]
+  cashbackTransactions CashbackTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -470,6 +477,7 @@ model User {
   wagePayments WagePayment[]
   wagePaymentsCreated WagePayment[] @relation("WagePaymentCreatedBy")
   ordersCreated Order[] @relation("OrderCreatedBy")
+  cashbackTransactions CashbackTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -636,10 +644,14 @@ model Sale {
   branchId    String
   productId   String
   createdById String
+  cashbackTransactionId String?
+  cashbackRedeemTransactionId String?
 
   branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
   createdBy User    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  cashbackTransaction CashbackTransaction? @relation("EarnCashbackSales", fields: [cashbackTransactionId], references: [id], onDelete: SetNull)
+  cashbackRedeemTransaction CashbackTransaction? @relation("RedeemCashbackSales", fields: [cashbackRedeemTransactionId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -648,6 +660,56 @@ model Sale {
   @@index([productId])
   @@index([createdById])
   @@index([date])
+  @@index([cashbackTransactionId])
+  @@index([cashbackRedeemTransactionId])
+}
+
+model TelegramCashbackUser {
+  id                   String    @id @default(cuid())
+  telegramId           String    @unique
+  username             String?
+  firstName            String
+  lastName             String?
+  barcode              String    @unique
+  balance              Int       @default(0)
+  verifiedMember       Boolean   @default(false)
+  lastMembershipStatus String?
+  lastMembershipCheckAt DateTime?
+
+  transactions CashbackTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([barcode])
+}
+
+model CashbackTransaction {
+  id                   String                  @id @default(cuid())
+  type                 CashbackTransactionType @default(EARN)
+  amount               Int
+  saleAmount           Int                     @default(0)
+  ratePercent          Int                     @default(0)
+  barcode              String
+  note                 String?
+
+  telegramCashbackUserId String
+  branchId              String?
+  createdById           String?
+
+  telegramCashbackUser TelegramCashbackUser @relation(fields: [telegramCashbackUserId], references: [id], onDelete: Cascade)
+  branch               Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdBy            User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  earnedSales          Sale[]               @relation("EarnCashbackSales")
+  redeemedSales        Sale[]               @relation("RedeemCashbackSales")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([telegramCashbackUserId])
+  @@index([branchId])
+  @@index([createdById])
+  @@index([barcode])
 }
 
 model Order {

@@ -18,7 +18,7 @@ export class ReviewsController {
   @Post()
   @UseGuards(CustomerGuard)
   create(@Request() req, @Body() dto: CreateReviewDto) {
-    return this.reviewsService.create(req.user.id, dto);
+    return this.reviewsService.create(req.customer.id, dto);
   }
 
   @Get('product/:id')

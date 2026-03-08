@@ -22,13 +22,13 @@ export class CustomRequestsController {
   @Post()
   @UseGuards(CustomerGuard)
   create(@Request() req, @Body() dto: CreateCustomRequestDto) {
-    return this.customRequestsService.create(req.user.id, dto);
+    return this.customRequestsService.create(req.customer.id, dto);
   }
 
   @Get('my')
   @UseGuards(CustomerGuard)
   findMy(@Request() req) {
-    return this.customRequestsService.findByCustomer(req.user.id);
+    return this.customRequestsService.findByCustomer(req.customer.id);
   }
 
   // Admin endpoints (ERP)

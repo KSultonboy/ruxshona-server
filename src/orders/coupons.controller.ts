@@ -24,7 +24,7 @@ export class CouponsController {
     @Query('total') total: string,
     @Request() req,
   ) {
-    return this.couponsService.validate(code, req.user.id, parseInt(total));
+    return this.couponsService.validate(code, req.customer.id, parseInt(total));
   }
 
   @Get()

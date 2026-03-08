@@ -23,7 +23,10 @@ export class CustomerGuard implements CanActivate {
       if (payload.type !== 'customer') {
         throw new UnauthorizedException('Invalid user type');
       }
-      (req as any).customer = { id: payload.sub, phone: payload.phone };
+      const customer = { id: payload.sub, phone: payload.phone };
+      (req as any).customer = customer;
+      // Keep req.user aligned for older customer controllers that still read req.user.
+      (req as any).user = customer;
       return true;
     } catch {
       throw new UnauthorizedException('Invalid token');
