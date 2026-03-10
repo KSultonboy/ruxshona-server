@@ -103,6 +103,106 @@ export class TelegramCashbackService {
     return user;
   }
 
+  async listUsers(input?: { q?: string; limit?: string }) {
+    const q = (input?.q ?? '').trim();
+    const parsedLimit = Number(input?.limit ?? 100);
+    const take = Number.isFinite(parsedLimit)
+      ? Math.max(1, Math.min(500, Math.floor(parsedLimit)))
+      : 100;
+
+    const where = q
+      ? {
+          OR: [
+            { barcode: { contains: q, mode: 'insensitive' as const } },
+            { firstName: { contains: q, mode: 'insensitive' as const } },
+            { lastName: { contains: q, mode: 'insensitive' as const } },
+            { username: { contains: q, mode: 'insensitive' as const } },
+            { telegramId: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : undefined;
+
+    const users = await this.prisma.telegramCashbackUser.findMany({
+      where,
+      take,
+      orderBy: [{ balance: 'desc' }, { updatedAt: 'desc' }],
+      include: {
+        transactions: {
+          select: {
+            type: true,
+            amount: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!users.length) return [];
+
+    const userIds = users.map((user) => user.id);
+    const grouped = await this.prisma.cashbackTransaction.groupBy({
+      by: ['telegramCashbackUserId', 'type'],
+      where: {
+        telegramCashbackUserId: { in: userIds },
+      },
+      _sum: {
+        amount: true,
+      },
+      _count: {
+        _all: true,
+      },
+    });
+
+    const summaryMap = new Map<
+      string,
+      { totalEarned: number; totalRedeemed: number; transactionCount: number }
+    >();
+
+    for (const row of grouped) {
+      const prev = summaryMap.get(row.telegramCashbackUserId) ?? {
+        totalEarned: 0,
+        totalRedeemed: 0,
+        transactionCount: 0,
+      };
+      const amount = row._sum.amount ?? 0;
+      if (row.type === CashbackTransactionType.EARN) {
+        prev.totalEarned += amount;
+      } else if (row.type === CashbackTransactionType.REDEEM) {
+        prev.totalRedeemed += amount;
+      }
+      prev.transactionCount += row._count._all ?? 0;
+      summaryMap.set(row.telegramCashbackUserId, prev);
+    }
+
+    return users.map((user) => {
+      const summary = summaryMap.get(user.id) ?? {
+        totalEarned: 0,
+        totalRedeemed: 0,
+        transactionCount: 0,
+      };
+      return {
+        id: user.id,
+        telegramId: user.telegramId,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        barcode: user.barcode,
+        balance: user.balance,
+        verifiedMember: user.verifiedMember,
+        lastMembershipStatus: user.lastMembershipStatus,
+        lastMembershipCheckAt: user.lastMembershipCheckAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        transactionCount: summary.transactionCount,
+        totalEarned: summary.totalEarned,
+        totalRedeemed: summary.totalRedeemed,
+        lastTransaction: user.transactions[0] ?? null,
+      };
+    });
+  }
+
   async awardCashback(dto: AwardCashbackDto, user: AuthUser) {
     const settled = await this.settleCashback(
       {

@@ -141,16 +141,16 @@ model Branch {
   phone         String?
   warehouseMode BranchWarehouseMode @default(SEPARATE)
 
-  users        User[]
-  branchStocks BranchStock[]
-  transfers    Transfer[]
-  returns      Return[]
-  sales        Sale[]
-  shifts       Shift[]
-  payments     Payment[]
-  alertRules   AlertRule[]
-  permissions  UserPermission[]
-  inventoryChecks InventoryCheck[]
+  users                User[]
+  branchStocks         BranchStock[]
+  transfers            Transfer[]
+  returns              Return[]
+  sales                Sale[]
+  shifts               Shift[]
+  payments             Payment[]
+  alertRules           AlertRule[]
+  permissions          UserPermission[]
+  inventoryChecks      InventoryCheck[]
   cashbackTransactions CashbackTransaction[]
 
   createdAt DateTime @default(now())
@@ -192,7 +192,7 @@ model ProductCategory {
   id   String @id @default(cuid())
   name String @unique
 
-  products Product[]
+  products          Product[]
   expenseCategories ExpenseCategory[]
 
   createdAt DateTime @default(now())
@@ -200,13 +200,13 @@ model ProductCategory {
 }
 
 model ExpenseCategory {
-  id   String @id @default(cuid())
-  name String @unique
-  type ExpenseCategoryType @default(NORMAL)
+  id                String              @id @default(cuid())
+  name              String              @unique
+  type              ExpenseCategoryType @default(NORMAL)
   productCategoryId String?
 
-  expenses Expense[]
-  expenseItems ExpenseItem[]
+  expenses        Expense[]
+  expenseItems    ExpenseItem[]
   productCategory ProductCategory? @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
@@ -214,36 +214,36 @@ model ExpenseCategory {
 }
 
 model Product {
-  id       String      @id @default(cuid())
-  name     String
-  barcode  String?     @unique
-  type     ProductType
-  price    Int?
-  salePrice Int?
-  shopPrice Int?
-  active   Boolean     @default(true)
-  images   String[]
-  videos   String[]     @default([])
-  stock    Float       @default(0)
-  minStock Int         @default(0)
-  labourPrice Int      @default(0)
+  id          String      @id @default(cuid())
+  name        String
+  barcode     String?     @unique
+  type        ProductType
+  price       Int?
+  salePrice   Int?
+  shopPrice   Int?
+  active      Boolean     @default(true)
+  images      String[]
+  videos      String[]    @default([])
+  stock       Float       @default(0)
+  minStock    Int         @default(0)
+  labourPrice Int         @default(0)
 
   categoryId String
   unitId     String
 
-  category       ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  unit           Unit            @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  stockMovements StockMovement[]
-  branchStocks   BranchStock[]
-  transferItems  TransferItem[]
-  returnItems    ReturnItem[]
-  sales          Sale[]
-  alertRules     AlertRule[]
+  category            ProductCategory      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  unit                Unit                 @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  stockMovements      StockMovement[]
+  branchStocks        BranchStock[]
+  transferItems       TransferItem[]
+  returnItems         ReturnItem[]
+  sales               Sale[]
+  alertRules          AlertRule[]
   inventoryCheckItems InventoryCheckItem[]
-  expenses       Expense[]
-  expenseItems   ExpenseItem[]
-  orderItems     OrderItem[]
-  reviews        Review[]
+  expenses            Expense[]
+  expenseItems        ExpenseItem[]
+  orderItems          OrderItem[]
+  reviews             Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -280,14 +280,15 @@ model Expense {
   amount        Int
   paymentMethod PaymentMethod
   note          String?
+  batchId       String?
   quantity      Int?
 
-  categoryId String
-  category   ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  productId  String?
-  product    Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
+  categoryId    String
+  category      ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  productId     String?
+  product       Product?        @relation(fields: [productId], references: [id], onDelete: Restrict)
   expenseItemId String?
-  expenseItem ExpenseItem? @relation(fields: [expenseItemId], references: [id], onDelete: SetNull)
+  expenseItem   ExpenseItem?    @relation(fields: [expenseItemId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -297,26 +298,27 @@ model Expense {
   @@index([productId])
   @@index([expenseItemId])
   @@index([paymentMethod])
+  @@index([batchId])
 }
 
 model ExpenseItem {
-  id String @id @default(cuid())
+  id   String @id @default(cuid())
   name String
 
   categoryId String
-  category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category   ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   productId String?
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   expenses Expense[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([categoryId, name])
   @@index([categoryId])
   @@index([productId])
-  @@unique([categoryId, name])
 }
 
 model StockMovement {
@@ -326,9 +328,9 @@ model StockMovement {
   quantity Float
   note     String?
 
-  productId String
+  productId   String
   createdById String?
-  
+
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
   createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -359,7 +361,7 @@ model Transfer {
   createdBy  User    @relation("TransferCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   receivedBy User?   @relation("TransferReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
 
-  items     TransferItem[]
+  items TransferItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -415,10 +417,10 @@ model Return {
 }
 
 model ReturnItem {
-  id       String @id @default(cuid())
-  returnId String
+  id        String @id @default(cuid())
+  returnId  String
   productId String
-  quantity Int
+  quantity  Int
 
   ret     Return  @relation(fields: [returnId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
@@ -461,22 +463,22 @@ model User {
   branchId String?
   branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
-  refreshTokens RefreshToken[]
-  pushTokens   PushToken[]
-  transfersCreated Transfer[] @relation("TransferCreatedBy")
-  transfersReceived Transfer[] @relation("TransferReceivedBy")
-  returnsCreated Return[] @relation("ReturnCreatedBy")
-  returnsApproved Return[] @relation("ReturnApprovedBy")
-  sales Sale[]
-  shifts Shift[] @relation("ShiftOpenedBy")
-  permissions UserPermission[]
-  payments Payment[] @relation("PaymentCreatedBy")
-  auditLogs AuditLog[]
-  inventoryChecks InventoryCheck[]
-  stockMovements StockMovement[]
-  wagePayments WagePayment[]
-  wagePaymentsCreated WagePayment[] @relation("WagePaymentCreatedBy")
-  ordersCreated Order[] @relation("OrderCreatedBy")
+  refreshTokens        RefreshToken[]
+  pushTokens           PushToken[]
+  transfersCreated     Transfer[]            @relation("TransferCreatedBy")
+  transfersReceived    Transfer[]            @relation("TransferReceivedBy")
+  returnsCreated       Return[]              @relation("ReturnCreatedBy")
+  returnsApproved      Return[]              @relation("ReturnApprovedBy")
+  sales                Sale[]
+  shifts               Shift[]               @relation("ShiftOpenedBy")
+  permissions          UserPermission[]
+  payments             Payment[]             @relation("PaymentCreatedBy")
+  auditLogs            AuditLog[]
+  inventoryChecks      InventoryCheck[]
+  stockMovements       StockMovement[]
+  wagePayments         WagePayment[]
+  wagePaymentsCreated  WagePayment[]         @relation("WagePaymentCreatedBy")
+  ordersCreated        Order[]               @relation("OrderCreatedBy")
   cashbackTransactions CashbackTransaction[]
 
   createdAt DateTime @default(now())
@@ -484,15 +486,15 @@ model User {
 }
 
 model Customer {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   name         String
-  phone        String   @unique
+  phone        String  @unique
   passwordHash String
   address      String?
-  active       Boolean  @default(true)
+  active       Boolean @default(true)
 
-  orders Order[]
-  reviews Review[]
+  orders         Order[]
+  reviews        Review[]
   customRequests CustomRequest[]
   points         Int             @default(0)
   birthday       String?
@@ -502,12 +504,12 @@ model Customer {
 }
 
 model UserPermission {
-  id         String      @id @default(cuid())
+  id         String     @id @default(cuid())
   userId     String
   permission Permission
   branchId   String?
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
@@ -518,7 +520,7 @@ model UserPermission {
 }
 
 model AuditLog {
-  id       String   @id @default(cuid())
+  id       String    @id @default(cuid())
   action   String
   entity   String
   entityId String?
@@ -565,8 +567,8 @@ model Payment {
   paymentMethod PaymentMethod
   note          String?
 
-  branchId String?
-  shopId   String?
+  branchId    String?
+  shopId      String?
   createdById String
 
   branch    Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -590,7 +592,7 @@ model AlertRule {
   active    Boolean       @default(true)
   note      String?
 
-  branchId String?
+  branchId  String?
   productId String?
 
   branch  Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
@@ -620,8 +622,8 @@ model RefreshToken {
 }
 
 model PushToken {
-  id       String @id @default(cuid())
-  token    String @unique
+  id       String  @id @default(cuid())
+  token    String  @unique
   platform String?
   device   String?
 
@@ -635,22 +637,22 @@ model PushToken {
 }
 
 model Sale {
-  id          String         @id @default(cuid())
-  date        String         @db.VarChar(10)
-  quantity    Float
+  id            String        @id @default(cuid())
+  date          String        @db.VarChar(10)
+  quantity      Float
   paymentMethod PaymentMethod
-  price       Int
+  price         Int
 
-  branchId    String
-  productId   String
-  createdById String
-  cashbackTransactionId String?
+  branchId                    String
+  productId                   String
+  createdById                 String
+  cashbackTransactionId       String?
   cashbackRedeemTransactionId String?
 
-  branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
-  createdBy User    @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  cashbackTransaction CashbackTransaction? @relation("EarnCashbackSales", fields: [cashbackTransactionId], references: [id], onDelete: SetNull)
+  branch                    Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  product                   Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdBy                 User                 @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  cashbackTransaction       CashbackTransaction? @relation("EarnCashbackSales", fields: [cashbackTransactionId], references: [id], onDelete: SetNull)
   cashbackRedeemTransaction CashbackTransaction? @relation("RedeemCashbackSales", fields: [cashbackRedeemTransactionId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
@@ -665,15 +667,15 @@ model Sale {
 }
 
 model TelegramCashbackUser {
-  id                   String    @id @default(cuid())
-  telegramId           String    @unique
-  username             String?
-  firstName            String
-  lastName             String?
-  barcode              String    @unique
-  balance              Int       @default(0)
-  verifiedMember       Boolean   @default(false)
-  lastMembershipStatus String?
+  id                    String    @id @default(cuid())
+  telegramId            String    @unique
+  username              String?
+  firstName             String
+  lastName              String?
+  barcode               String    @unique
+  balance               Int       @default(0)
+  verifiedMember        Boolean   @default(false)
+  lastMembershipStatus  String?
   lastMembershipCheckAt DateTime?
 
   transactions CashbackTransaction[]
@@ -685,17 +687,17 @@ model TelegramCashbackUser {
 }
 
 model CashbackTransaction {
-  id                   String                  @id @default(cuid())
-  type                 CashbackTransactionType @default(EARN)
-  amount               Int
-  saleAmount           Int                     @default(0)
-  ratePercent          Int                     @default(0)
-  barcode              String
-  note                 String?
+  id          String                  @id @default(cuid())
+  type        CashbackTransactionType @default(EARN)
+  amount      Int
+  saleAmount  Int                     @default(0)
+  ratePercent Int                     @default(0)
+  barcode     String
+  note        String?
 
   telegramCashbackUserId String
-  branchId              String?
-  createdById           String?
+  branchId               String?
+  createdById            String?
 
   telegramCashbackUser TelegramCashbackUser @relation(fields: [telegramCashbackUserId], references: [id], onDelete: Cascade)
   branch               Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
@@ -726,7 +728,7 @@ model Order {
   note         String?
 
   createdById String?
-  createdBy   User? @relation("OrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy   User?   @relation("OrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -753,7 +755,7 @@ model OrderItem {
   unitPrice   Int
   lineTotal   Int
 
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
@@ -796,17 +798,17 @@ model InventoryCheckItem {
 }
 
 model Review {
-  id         String   @id @default(cuid())
-  rating     Int      // 1-5
+  id         String  @id @default(cuid())
+  rating     Int // 1-5
   comment    String?
   productId  String
   customerId String
 
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([productId])
   @@index([customerId])
@@ -830,40 +832,40 @@ model CustomRequest {
   priceQuote      Int?
   adminNote       String?
 
-  customer        Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([customerId])
   @@index([status])
 }
 
 model Coupon {
-  id          String   @id @default(cuid())
-  code        String   @unique
-  discount    Int      // Amount or percentage? Let's assume absolute amount for now
-  isPercent   Boolean  @default(false)
-  minOrder    Int      @default(0)
-  maxUses     Int      @default(1)
-  usedCount   Int      @default(0)
-  expiresAt   DateTime?
-  active      Boolean  @default(true)
+  id        String    @id @default(cuid())
+  code      String    @unique
+  discount  Int // Amount or percentage? Let's assume absolute amount for now
+  isPercent Boolean   @default(false)
+  minOrder  Int       @default(0)
+  maxUses   Int       @default(1)
+  usedCount Int       @default(0)
+  expiresAt DateTime?
+  active    Boolean   @default(true)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([code])
 }
 
 model Post {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  title     String
-  content   String
-  image     String?
-  active    Boolean  @default(true)
-  
+  id      String  @id @default(cuid())
+  slug    String  @unique
+  title   String
+  content String
+  image   String?
+  active  Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

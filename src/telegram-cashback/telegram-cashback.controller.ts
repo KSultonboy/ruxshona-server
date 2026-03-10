@@ -5,6 +5,7 @@ import {
   Headers,
   Param,
   Post,
+  Query,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -58,6 +59,17 @@ export class TelegramCashbackController {
   @Permissions(Permission.SALES_READ)
   lookupBarcode(@Param('barcode') barcode: string) {
     return this.service.lookupByBarcode(barcode);
+  }
+
+  @Get('users')
+  @UseGuards(AuthGuard, AccessGuard)
+  @Roles('ADMIN')
+  @Permissions(Permission.REPORTS_READ)
+  listUsers(@Query() query: Record<string, string>) {
+    return this.service.listUsers({
+      q: query.q,
+      limit: query.limit,
+    });
   }
 
   @Post('award')

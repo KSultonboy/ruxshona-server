@@ -48,4 +48,9 @@ export class CreateExpenseDto {
   @IsString()
   @MaxLength(200)
   note?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  batchId?: string;
 }

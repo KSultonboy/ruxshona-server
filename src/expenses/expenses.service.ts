@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
@@ -38,12 +39,16 @@ export class ExpensesService {
         throw new BadRequestException('Expense item category mismatch');
       }
 
-      const baseData: any = {
+      const baseData: Omit<
+        Prisma.ExpenseUncheckedCreateInput,
+        'productId' | 'quantity'
+      > = {
         date: dto.date,
         categoryId: dto.categoryId,
         amount: dto.amount ?? 0,
         paymentMethod: dto.paymentMethod,
         note: dto.note?.trim() || null,
+        batchId: dto.batchId?.trim() || null,
         expenseItemId: dto.expenseItemId,
       };
 
