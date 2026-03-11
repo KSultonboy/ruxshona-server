@@ -642,6 +642,7 @@ model Sale {
   quantity      Float
   paymentMethod PaymentMethod
   price         Int
+  saleGroupId   String?       @db.VarChar(64)
 
   branchId                    String
   productId                   String
@@ -662,6 +663,7 @@ model Sale {
   @@index([productId])
   @@index([createdById])
   @@index([date])
+  @@index([saleGroupId])
   @@index([cashbackTransactionId])
   @@index([cashbackRedeemTransactionId])
 }

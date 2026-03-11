@@ -1,15 +1,16 @@
 import {
+  IsArray,
   IsEnum,
   IsNumber,
-  IsOptional,
   IsString,
   Matches,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
 import { Type } from 'class-transformer';
 
-export class CreateSaleDto {
+class UpdateSaleGroupItemDto {
   @IsString()
   barcode: string;
 
@@ -20,20 +21,18 @@ export class CreateSaleDto {
   )
   @Min(0.001)
   quantity: number;
+}
+
+export class UpdateSaleGroupDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateSaleGroupItemDto)
+  items: UpdateSaleGroupItemDto[];
 
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;
 
-  @IsOptional()
-  @IsString()
-  branchId?: string;
-
-  @IsOptional()
   @IsString()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
-  date?: string; // YYYY-MM-DD
-
-  @IsOptional()
-  @IsString()
-  saleGroupId?: string;
+  date: string;
 }

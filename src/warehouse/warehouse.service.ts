@@ -1,10 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
+import { UpdateStockMovementDto } from './dto/update-stock-movement.dto';
+import { type AuthUser } from '../auth/guards/auth.guard';
 import { Prisma, StockMovementType } from '@prisma/client';
 import { isISODate } from '../utils/date';
 
@@ -150,6 +153,79 @@ export class WarehouseService {
     });
   }
 
+  async updateMovement(id: string, dto: UpdateStockMovementDto, user: AuthUser) {
+    const existing = await this.prisma.stockMovement.findUnique({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException('Stock movement not found');
+
+    this.ensureMovementOwnership(existing.createdById ?? null, user);
+
+    const nextDate = dto.date ?? existing.date;
+    if (!isISODate(nextDate)) throw new BadRequestException('Invalid date');
+
+    const nextProductId = dto.productId ?? existing.productId;
+    const nextType = dto.type ?? existing.type;
+    const nextQuantity = dto.quantity ?? existing.quantity;
+    const nextNote = dto.note !== undefined ? dto.note.trim() || null : existing.note;
+
+    const product = await this.prisma.product.findUnique({
+      where: { id: nextProductId },
+      select: { id: true },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+
+    return this.prisma.$transaction(async (tx) => {
+      const deltas = new Map<string, number>();
+      this.addStockDelta(
+        deltas,
+        existing.productId,
+        -this.toStockEffect(existing.type, existing.quantity),
+      );
+      this.addStockDelta(
+        deltas,
+        nextProductId,
+        this.toStockEffect(nextType, nextQuantity),
+      );
+
+      await this.applyStockDeltas(tx, deltas);
+
+      return tx.stockMovement.update({
+        where: { id },
+        data: {
+          productId: nextProductId,
+          date: nextDate,
+          type: nextType,
+          quantity: nextQuantity,
+          note: nextNote,
+        },
+        select: movementSelectWithCreator,
+      });
+    });
+  }
+
+  async removeMovement(id: string, user: AuthUser) {
+    const existing = await this.prisma.stockMovement.findUnique({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException('Stock movement not found');
+
+    this.ensureMovementOwnership(existing.createdById ?? null, user);
+
+    await this.prisma.$transaction(async (tx) => {
+      const deltas = new Map<string, number>();
+      this.addStockDelta(
+        deltas,
+        existing.productId,
+        -this.toStockEffect(existing.type, existing.quantity),
+      );
+      await this.applyStockDeltas(tx, deltas);
+      await tx.stockMovement.delete({ where: { id } });
+    });
+
+    return { ok: true };
+  }
+
   private async listWithCreatorFallback(take: number) {
     try {
       return await this.prisma.stockMovement.findMany({
@@ -202,6 +278,64 @@ export class WarehouseService {
       }
 
       return tx.stockMovement.create({ data: baseData });
+    }
+  }
+
+  private ensureMovementOwnership(createdById: string | null, user: AuthUser) {
+    if (user.role !== 'PRODUCTION') return;
+    if (!createdById) return;
+    if (createdById !== user.id) {
+      throw new ForbiddenException('Forbidden');
+    }
+  }
+
+  private toStockEffect(type: StockMovementType, quantity: number) {
+    return type === StockMovementType.IN ? quantity : -quantity;
+  }
+
+  private addStockDelta(deltas: Map<string, number>, productId: string, value: number) {
+    deltas.set(productId, (deltas.get(productId) ?? 0) + value);
+  }
+
+  private async applyStockDeltas(
+    tx: Prisma.TransactionClient,
+    deltas: Map<string, number>,
+  ) {
+    const entries = [...deltas.entries()].filter(([, value]) => value !== 0);
+    if (entries.length === 0) return;
+
+    const products = await tx.product.findMany({
+      where: {
+        id: { in: entries.map(([productId]) => productId) },
+      },
+      select: { id: true },
+    });
+
+    if (products.length !== entries.length) {
+      throw new NotFoundException('Product not found');
+    }
+
+    for (const [productId, delta] of entries) {
+      if (delta > 0) {
+        await tx.product.update({
+          where: { id: productId },
+          data: { stock: { increment: delta } },
+        });
+        continue;
+      }
+
+      const decreaseBy = Math.abs(delta);
+      const updated = await tx.product.updateMany({
+        where: {
+          id: productId,
+          stock: { gte: decreaseBy },
+        },
+        data: { stock: { decrement: decreaseBy } },
+      });
+
+      if (updated.count !== 1) {
+        throw new BadRequestException('Insufficient stock');
+      }
     }
   }
 }

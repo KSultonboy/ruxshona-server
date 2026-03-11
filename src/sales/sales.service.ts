@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   BranchWarehouseMode,
+  Prisma,
   PaymentMethod,
   ShiftStatus,
 } from '@prisma/client';
@@ -16,6 +17,7 @@ import type { Express } from 'express';
 import { isISODate } from '../utils/date';
 import { unlink } from 'fs/promises';
 import { basename, join } from 'path';
+import { UpdateSaleGroupDto } from './dto/update-sale-group.dto';
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -27,9 +29,162 @@ type BranchContext = {
   warehouseMode: BranchWarehouseMode;
 };
 
+type RecentSaleGroupOptions = {
+  branchId?: string;
+  limit?: number;
+};
+
+type SaleWithProduct = Prisma.SaleGetPayload<{
+  include: {
+    product: {
+      select: {
+        id: true;
+        name: true;
+        barcode: true;
+        type: true;
+        salePrice: true;
+        price: true;
+        unit: { select: { name: true; short: true } };
+        images: true;
+      };
+    };
+  };
+}>;
+
 @Injectable()
 export class SalesService {
   constructor(private prisma: PrismaService) {}
+
+  private saleSelect = {
+    id: true,
+    name: true,
+    barcode: true,
+    type: true,
+    salePrice: true,
+    price: true,
+    unit: { select: { name: true, short: true } },
+    images: true,
+  } satisfies Prisma.ProductSelect;
+
+  private normalizeSaleGroupId(sale: {
+    saleGroupId?: string | null;
+    id: string;
+  }) {
+    return sale.saleGroupId?.trim() || sale.id;
+  }
+
+  private async restoreSaleStock(
+    tx: Prisma.TransactionClient,
+    branch: BranchContext,
+    sale: { branchId: string; productId: string; quantity: number },
+  ) {
+    if (branch.warehouseMode === BranchWarehouseMode.CENTRAL) {
+      await tx.product.update({
+        where: { id: sale.productId },
+        data: { stock: { increment: sale.quantity } },
+      });
+      return;
+    }
+
+    await tx.branchStock.update({
+      where: {
+        branchId_productId: {
+          branchId: sale.branchId,
+          productId: sale.productId,
+        },
+      },
+      data: { quantity: { increment: sale.quantity } },
+    });
+  }
+
+  private async reserveSaleStock(
+    tx: Prisma.TransactionClient,
+    branch: BranchContext,
+    sale: {
+      branchId: string;
+      productId: string;
+      quantity: number;
+      barcode: string;
+    },
+  ) {
+    if (branch.warehouseMode === BranchWarehouseMode.CENTRAL) {
+      const updated = await tx.product.updateMany({
+        where: { id: sale.productId, stock: { gte: sale.quantity } },
+        data: { stock: { decrement: sale.quantity } },
+      });
+      if (updated.count !== 1) {
+        throw new BadRequestException(
+          `Insufficient central stock for ${sale.barcode}`,
+        );
+      }
+      return;
+    }
+
+    const updated = await tx.branchStock.updateMany({
+      where: {
+        branchId: sale.branchId,
+        productId: sale.productId,
+        quantity: { gte: sale.quantity },
+      },
+      data: { quantity: { decrement: sale.quantity } },
+    });
+    if (updated.count !== 1) {
+      throw new BadRequestException(
+        `Insufficient branch stock for ${sale.barcode}`,
+      );
+    }
+  }
+
+  private async findSaleGroup(groupId: string) {
+    return this.prisma.sale.findMany({
+      where: {
+        OR: [{ saleGroupId: groupId }, { saleGroupId: null, id: groupId }],
+      },
+      include: {
+        product: {
+          select: this.saleSelect,
+        },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  private async assertCanManageSaleGroup(
+    user: AuthUser,
+    sales: Array<{ branchId: string; createdById: string }>,
+  ) {
+    if (sales.length === 0) {
+      throw new NotFoundException('Sale group not found');
+    }
+    const branchId = sales[0].branchId;
+    const branch = await this.resolveBranchContext(user, branchId);
+    const actorId = user.id ?? user.sub;
+    if (
+      user.role === 'SALES' &&
+      sales.some((sale) => sale.createdById !== actorId)
+    ) {
+      throw new ForbiddenException('You can only manage your own sales');
+    }
+    return branch;
+  }
+
+  private ensureNoCashbackLinked(
+    sales: Array<{
+      cashbackTransactionId?: string | null;
+      cashbackRedeemTransactionId?: string | null;
+    }>,
+  ) {
+    if (
+      sales.some(
+        (sale) =>
+          sale.cashbackTransactionId || sale.cashbackRedeemTransactionId,
+      )
+    ) {
+      throw new BadRequestException(
+        'Cashback linked sales cannot be edited or deleted',
+      );
+    }
+  }
 
   private async tryDeleteShiftPhotoFile(photoUrl: string) {
     const clean = String(photoUrl || '').trim();
@@ -191,7 +346,7 @@ export class SalesService {
       throw new BadRequestException('Invalid from date');
     if (range.to && !isISODate(range.to))
       throw new BadRequestException('Invalid to date');
-    const where: any = {};
+    const where: Prisma.SaleWhereInput = {};
     if (branchFilter) where.branchId = branchFilter;
     if (range.from || range.to) {
       where.date = {
@@ -204,20 +359,141 @@ export class SalesService {
       where,
       include: {
         product: {
-          select: {
-            id: true,
-            name: true,
-            barcode: true,
-            type: true,
-            salePrice: true,
-            price: true,
-            unit: { select: { name: true, short: true } },
-            images: true,
-          },
+          select: this.saleSelect,
         },
       },
       orderBy: { date: 'asc' },
     });
+  }
+
+  async recentGroups(user: AuthUser, options: RecentSaleGroupOptions = {}) {
+    const branch = await this.resolveBranchContext(user, options.branchId);
+    const limit = Math.min(Math.max(Number(options.limit ?? 5) || 5, 1), 10);
+
+    const sales = await this.prisma.sale.findMany({
+      where: { branchId: branch.id },
+      include: {
+        product: {
+          select: this.saleSelect,
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 100,
+    });
+
+    const centralStocks =
+      branch.warehouseMode === BranchWarehouseMode.CENTRAL
+        ? Object.fromEntries(
+            (
+              await this.prisma.product.findMany({
+                where: {
+                  id: { in: sales.map((sale) => sale.productId) },
+                },
+                select: { id: true, stock: true },
+              })
+            ).map((item) => [item.id, Number(item.stock ?? 0)]),
+          )
+        : null;
+
+    const branchStocks =
+      branch.warehouseMode === BranchWarehouseMode.CENTRAL
+        ? null
+        : Object.fromEntries(
+            (
+              await this.prisma.branchStock.findMany({
+                where: {
+                  branchId: branch.id,
+                  productId: { in: sales.map((sale) => sale.productId) },
+                },
+                select: { productId: true, quantity: true },
+              })
+            ).map((item) => [item.productId, Number(item.quantity ?? 0)]),
+          );
+
+    const grouped = new Map<
+      string,
+      {
+        id: string;
+        saleGroupId: string | null;
+        branchId: string;
+        date: string;
+        paymentMethod: PaymentMethod;
+        createdAt: string;
+        updatedAt: string;
+        createdById: string;
+        total: number;
+        totalQuantity: number;
+        cashbackLocked: boolean;
+        items: Array<{
+          saleId: string;
+          barcode: string;
+          productId: string;
+          name: string;
+          price: number;
+          quantity: number;
+          editableStock: number;
+        }>;
+      }
+    >();
+
+    for (const sale of sales) {
+      const groupId = this.normalizeSaleGroupId(sale);
+      const currentStock =
+        branch.warehouseMode === BranchWarehouseMode.CENTRAL
+          ? Number(centralStocks?.[sale.productId] ?? 0)
+          : Number(branchStocks?.[sale.productId] ?? 0);
+      const editableStock = currentStock + Number(sale.quantity ?? 0);
+      const existing = grouped.get(groupId);
+      const item = {
+        saleId: sale.id,
+        barcode: sale.product?.barcode ?? '',
+        productId: sale.productId,
+        name: sale.product?.name ?? 'Mahsulot',
+        price: Number(sale.price ?? 0),
+        quantity: Number(sale.quantity ?? 0),
+        editableStock,
+      };
+
+      if (existing) {
+        existing.total += item.price * item.quantity;
+        existing.totalQuantity += item.quantity;
+        existing.updatedAt =
+          new Date(sale.updatedAt) > new Date(existing.updatedAt)
+            ? sale.updatedAt.toISOString()
+            : existing.updatedAt;
+        existing.cashbackLocked =
+          existing.cashbackLocked ||
+          Boolean(
+            sale.cashbackTransactionId || sale.cashbackRedeemTransactionId,
+          );
+        existing.items.push(item);
+        continue;
+      }
+
+      grouped.set(groupId, {
+        id: groupId,
+        saleGroupId: sale.saleGroupId ?? null,
+        branchId: sale.branchId,
+        date: sale.date,
+        paymentMethod: sale.paymentMethod,
+        createdAt: sale.createdAt.toISOString(),
+        updatedAt: sale.updatedAt.toISOString(),
+        createdById: sale.createdById,
+        total: item.price * item.quantity,
+        totalQuantity: item.quantity,
+        cashbackLocked: Boolean(
+          sale.cashbackTransactionId || sale.cashbackRedeemTransactionId,
+        ),
+        items: [item],
+      });
+    }
+
+    return Array.from(grouped.values())
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+      .slice(0, limit);
   }
 
   async branchStock(user: AuthUser, branchId?: string) {
@@ -348,22 +624,14 @@ export class SalesService {
             quantity,
             paymentMethod,
             price,
+            saleGroupId: dto.saleGroupId?.trim() || null,
             branchId,
             productId: product.id,
             createdById,
           },
           include: {
             product: {
-              select: {
-                id: true,
-                name: true,
-                barcode: true,
-                type: true,
-                salePrice: true,
-                price: true,
-                unit: { select: { name: true, short: true } },
-                images: true,
-              },
+              select: this.saleSelect,
             },
           },
         });
@@ -392,27 +660,118 @@ export class SalesService {
           quantity,
           paymentMethod,
           price,
+          saleGroupId: dto.saleGroupId?.trim() || null,
           branchId,
           productId: product.id,
           createdById,
         },
         include: {
           product: {
-            select: {
-              id: true,
-              name: true,
-              barcode: true,
-              type: true,
-              salePrice: true,
-              price: true,
-              unit: { select: { name: true, short: true } },
-              images: true,
-            },
+            select: this.saleSelect,
           },
         },
       });
     });
 
     return sale;
+  }
+
+  async updateGroup(groupId: string, dto: UpdateSaleGroupDto, user: AuthUser) {
+    const existingSales = await this.findSaleGroup(groupId);
+    const branch = await this.assertCanManageSaleGroup(user, existingSales);
+    this.ensureNoCashbackLinked(existingSales);
+
+    const normalizedItems = dto.items
+      .map((item) => ({
+        barcode: item.barcode.trim(),
+        quantity: Number(item.quantity.toFixed(3)),
+      }))
+      .filter((item) => item.barcode && item.quantity > 0);
+
+    if (normalizedItems.length === 0) {
+      throw new BadRequestException('At least one item is required');
+    }
+
+    const original = existingSales[0];
+    const nextGroupId = original.saleGroupId?.trim() || groupId;
+
+    return this.prisma.$transaction(async (tx) => {
+      for (const sale of existingSales) {
+        await this.restoreSaleStock(tx, branch, {
+          branchId: sale.branchId,
+          productId: sale.productId,
+          quantity: Number(sale.quantity),
+        });
+      }
+
+      await tx.sale.deleteMany({
+        where: { id: { in: existingSales.map((sale) => sale.id) } },
+      });
+
+      const created: SaleWithProduct[] = [];
+      for (const item of normalizedItems) {
+        const product = await tx.product.findUnique({
+          where: { barcode: item.barcode },
+          select: this.saleSelect,
+        });
+        if (!product) {
+          throw new NotFoundException(`Product not found: ${item.barcode}`);
+        }
+
+        await this.reserveSaleStock(tx, branch, {
+          branchId: branch.id,
+          productId: product.id,
+          quantity: item.quantity,
+          barcode: item.barcode,
+        });
+
+        const sale = await tx.sale.create({
+          data: {
+            date: dto.date,
+            quantity: item.quantity,
+            paymentMethod: dto.paymentMethod,
+            price: product.salePrice ?? product.price ?? 0,
+            saleGroupId: nextGroupId,
+            branchId: branch.id,
+            productId: product.id,
+            createdById: original.createdById,
+          },
+          include: {
+            product: {
+              select: this.saleSelect,
+            },
+          },
+        });
+        created.push(sale);
+      }
+
+      return created;
+    });
+  }
+
+  async deleteGroup(groupId: string, user: AuthUser) {
+    const existingSales = await this.findSaleGroup(groupId);
+    const branch = await this.assertCanManageSaleGroup(user, existingSales);
+    this.ensureNoCashbackLinked(existingSales);
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const sale of existingSales) {
+        await this.restoreSaleStock(tx, branch, {
+          branchId: sale.branchId,
+          productId: sale.productId,
+          quantity: Number(sale.quantity),
+        });
+      }
+
+      await tx.sale.deleteMany({
+        where: { id: { in: existingSales.map((sale) => sale.id) } },
+      });
+    });
+
+    return {
+      ok: true,
+      deletedCount: existingSales.length,
+      groupId,
+    };
   }
 }

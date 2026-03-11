@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UploadedFiles,
@@ -23,6 +24,7 @@ import { diskStorage } from 'multer';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { join } from 'path';
 import { RemoveShiftPhotoDto } from './dto/remove-shift-photo.dto';
+import { UpdateSaleGroupDto } from './dto/update-sale-group.dto';
 
 @Controller('sales')
 @UseGuards(AuthGuard, AccessGuard)
@@ -64,6 +66,38 @@ export class SalesController {
   @Permissions(Permission.SALES_WRITE)
   sell(@Body() dto: CreateSaleDto, @User() user: AuthUser) {
     return this.service.sell(dto, user);
+  }
+
+  @Get('recent-groups')
+  @Roles('ADMIN', 'SALES')
+  @Permissions(Permission.SALES_READ)
+  recentGroups(
+    @User() user: AuthUser,
+    @Query('branchId') branchId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.recentGroups(user, {
+      branchId,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  @Patch('groups/:groupId')
+  @Roles('ADMIN', 'SALES')
+  @Permissions(Permission.SALES_WRITE)
+  updateGroup(
+    @Param('groupId') groupId: string,
+    @Body() dto: UpdateSaleGroupDto,
+    @User() user: AuthUser,
+  ) {
+    return this.service.updateGroup(groupId, dto, user);
+  }
+
+  @Delete('groups/:groupId')
+  @Roles('ADMIN', 'SALES')
+  @Permissions(Permission.SALES_WRITE)
+  deleteGroup(@Param('groupId') groupId: string, @User() user: AuthUser) {
+    return this.service.deleteGroup(groupId, user);
   }
 
   @Get('shift')

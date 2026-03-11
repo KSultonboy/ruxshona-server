@@ -1,10 +1,22 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { WarehouseService } from './warehouse.service';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
-import { AuthGuard } from '../auth/guards/auth.guard';
+import { UpdateStockMovementDto } from './dto/update-stock-movement.dto';
+import { AuthGuard, type AuthUser } from '../auth/guards/auth.guard';
 import { AccessGuard } from '../auth/guards/access.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import { User } from '../auth/decorators/user.decorator';
 import { Permission } from '@prisma/client';
 
 @Controller('warehouse')
@@ -32,5 +44,23 @@ export class WarehouseController {
   @Permissions(Permission.WAREHOUSE_WRITE)
   create(@Body() dto: CreateStockMovementDto) {
     return this.service.createMovement(dto);
+  }
+
+  @Patch('movements/:id')
+  @Roles('ADMIN', 'PRODUCTION')
+  @Permissions(Permission.WAREHOUSE_WRITE)
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateStockMovementDto,
+    @User() user: AuthUser,
+  ) {
+    return this.service.updateMovement(id, dto, user);
+  }
+
+  @Delete('movements/:id')
+  @Roles('ADMIN', 'PRODUCTION')
+  @Permissions(Permission.WAREHOUSE_WRITE)
+  remove(@Param('id') id: string, @User() user: AuthUser) {
+    return this.service.removeMovement(id, user);
   }
 }

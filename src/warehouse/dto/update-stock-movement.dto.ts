@@ -1,39 +1,41 @@
+import { StockMovementType } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
   IsEnum,
   IsNumber,
   IsOptional,
   IsString,
   Matches,
+  Max,
+  MaxLength,
   Min,
 } from 'class-validator';
-import { PaymentMethod } from '@prisma/client';
-import { Type } from 'class-transformer';
 
-export class CreateSaleDto {
+export class UpdateStockMovementDto {
+  @IsOptional()
   @IsString()
-  barcode: string;
+  productId?: string;
 
+  @IsOptional()
+  @IsEnum(StockMovementType)
+  type?: StockMovementType;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber(
     { maxDecimalPlaces: 3, allowInfinity: false, allowNaN: false },
     { message: 'quantity must be a valid number with up to 3 decimal places' },
   )
   @Min(0.001)
-  quantity: number;
-
-  @IsEnum(PaymentMethod)
-  paymentMethod: PaymentMethod;
+  @Max(1000000)
+  quantity?: number;
 
   @IsOptional()
-  @IsString()
-  branchId?: string;
-
-  @IsOptional()
-  @IsString()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
-  date?: string; // YYYY-MM-DD
+  date?: string;
 
   @IsOptional()
   @IsString()
-  saleGroupId?: string;
+  @MaxLength(200)
+  note?: string;
 }
