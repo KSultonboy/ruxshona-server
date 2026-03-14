@@ -97,10 +97,22 @@ export class ExpensesService {
         });
       }
 
-      if (!dto.amount || dto.amount <= 0) {
-        throw new BadRequestException('Amount required for normal expense');
+      const qty = dto.quantity ?? 1;
+      if (qty <= 0) {
+        throw new BadRequestException('Quantity required for normal expense');
       }
-      return await this.prisma.expense.create({ data: baseData });
+      if (!expenseItem.costPrice || expenseItem.costPrice <= 0) {
+        throw new BadRequestException('Cost price required for normal expense');
+      }
+
+      return await this.prisma.expense.create({
+        data: {
+          ...baseData,
+          amount: expenseItem.costPrice * qty,
+          quantity: qty,
+          productId: null,
+        },
+      });
     } catch (e: any) {
       if (e instanceof BadRequestException) throw e;
       throw new BadRequestException('Expense create error (check categoryId)');
@@ -225,10 +237,14 @@ export class ExpensesService {
         throw new BadRequestException('Expense item category mismatch');
       }
 
-      const nextAmount = dto.amount ?? exists.amount;
-      if (!nextAmount || nextAmount <= 0) {
-        throw new BadRequestException('Amount required for normal expense');
+      const nextQuantity = dto.quantity ?? exists.quantity ?? 1;
+      if (nextQuantity <= 0) {
+        throw new BadRequestException('Quantity required for normal expense');
       }
+      if (!expenseItem.costPrice || expenseItem.costPrice <= 0) {
+        throw new BadRequestException('Cost price required for normal expense');
+      }
+      const nextAmount = expenseItem.costPrice * nextQuantity;
 
       await this.prisma.expense.update({
         where: { id },
@@ -237,7 +253,7 @@ export class ExpensesService {
           categoryId: nextCategoryId,
           expenseItemId: nextExpenseItemId,
           productId: null,
-          quantity: null,
+          quantity: nextQuantity,
           amount: nextAmount,
           note: dto.note === undefined ? undefined : dto.note?.trim() || null,
         },

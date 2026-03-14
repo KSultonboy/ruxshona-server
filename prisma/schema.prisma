@@ -310,6 +310,7 @@ model ExpenseItem {
 
   productId String?
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  costPrice Int?
 
   expenses Expense[]
 

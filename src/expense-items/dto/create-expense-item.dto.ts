@@ -20,4 +20,10 @@ export class CreateExpenseItemDto {
   @IsInt()
   @Min(0)
   salePrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  costPrice?: number;
 }

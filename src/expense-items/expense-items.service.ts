@@ -33,6 +33,7 @@ export class ExpenseItemsService {
 
     let productId = dto.productId ?? null;
     const salePrice = dto.salePrice ?? undefined;
+    let costPrice: number | null = dto.costPrice ?? null;
 
     if (category.type === 'SELLABLE') {
       if (!productId) {
@@ -83,8 +84,12 @@ export class ExpenseItemsService {
           });
         }
       }
+      costPrice = null;
     } else {
       productId = null;
+      if (!costPrice || costPrice <= 0) {
+        throw new BadRequestException('Cost price required for normal expense');
+      }
     }
 
     try {
@@ -93,6 +98,7 @@ export class ExpenseItemsService {
           name,
           categoryId: dto.categoryId,
           productId,
+          costPrice,
         },
       });
     } catch {
@@ -112,6 +118,7 @@ export class ExpenseItemsService {
 
     let productId = dto.productId ?? exists.productId ?? null;
     const salePrice = dto.salePrice ?? undefined;
+    let costPrice: number | null = dto.costPrice ?? exists.costPrice ?? null;
     if (category.type === 'SELLABLE') {
       if (!productId)
         throw new BadRequestException(
@@ -127,8 +134,12 @@ export class ExpenseItemsService {
           data: { salePrice },
         });
       }
+      costPrice = null;
     } else {
       productId = null;
+      if (!costPrice || costPrice <= 0) {
+        throw new BadRequestException('Cost price required for normal expense');
+      }
     }
 
     const name = dto.name?.trim();
@@ -139,6 +150,7 @@ export class ExpenseItemsService {
           name: name && name.length > 0 ? name : undefined,
           categoryId: nextCategoryId,
           productId,
+          costPrice,
         },
       });
       return { ok: true };
